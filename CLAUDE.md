@@ -23,7 +23,7 @@ go build ./...
 
 # 2. Sync to server (always use these excludes)
 rsync -av --exclude='.git' --exclude='*.db' --exclude='imgcache' --exclude='._*' \
-  /Volumes/Shuttle/projects/gamerepo/ \
+  /Volumes/Shuttle/projects/nisaba/ \
   truenas_admin@192.168.3.174:/mnt/MemoryAlpha/nisaba/source/
 
 # 3. Deploy (requires interactive terminal for sudo)
@@ -34,7 +34,7 @@ ssh -t truenas_admin@192.168.3.174 "cd /mnt/MemoryAlpha/nisaba/source && bash de
 ```bash
 rsync -av --exclude='*.db' --exclude='imgcache' --exclude='._*' \
   truenas_admin@192.168.3.174:/mnt/MemoryAlpha/nisaba/source/ \
-  /Volumes/Shuttle/projects/gamerepo/
+  /Volumes/Shuttle/projects/nisaba/
 ```
 
 ### Query the live DB (sqlite3 is on the host, not in the container)
@@ -47,7 +47,7 @@ sqlite3 /mnt/MemoryAlpha/nisaba/data/nisaba.db "SELECT ..."
 |---|---|
 | Production source | `truenas_admin@192.168.3.174:/mnt/MemoryAlpha/nisaba/source/` |
 | Live database | `truenas_admin@192.168.3.174:/mnt/MemoryAlpha/nisaba/data/nisaba.db` |
-| Local working copy | `/Volumes/Shuttle/projects/gamerepo/` |
+| Local working copy | `/Volumes/Shuttle/projects/nisaba/` |
 | DB inside container | `/data/nisaba.db` |
 
 ## Critical Constraints
