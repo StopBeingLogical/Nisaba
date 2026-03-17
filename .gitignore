@@ -1,0 +1,41 @@
+# Build output
+/nisaba
+
+# Database & runtime data
+*.db
+*.db-shm
+*.db-wal
+data/
+imgcache/
+
+# Uploaded library files (contain personal game lists)
+store_library_files/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Go
+vendor/
+
+# Claude Code local config
+.claude/
+
+# Design mockup images
+schema/Mockups/

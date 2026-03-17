@@ -1,0 +1,241 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Settings — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto">
+    <div class="px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-10">
+        <h1 class="text-lg font-semibold">Settings</h1>
+    </div>
+
+    <form hx-post="/settings" hx-target="#save-status" hx-swap="innerHTML" class="p-6 flex flex-col gap-6 max-w-xl">
+
+        <!-- ── Pricing thresholds ─────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">Price Thresholds</div>
+            <p class="text-xs text-gray-500 mb-4">
+                Prices at or below <span class="price-instant">instant buy</span> are highlighted green.
+                Prices at or below <span class="price-consider">consider</span> are highlighted yellow.
+                Custom thresholds appear as wishlist filters.
+            </p>
+            <div class="flex gap-4 mb-5">
+                <div class="flex-1">
+                    <label class="filter-heading">Instant Buy ($)</label>
+                    <input type="number" name="instant_buy_threshold" step="0.01" min="0"
+                        value="{{ .Config.InstantBuyThreshold }}"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <div class="flex-1">
+                    <label class="filter-heading">Consider ($)</label>
+                    <input type="number" name="consider_threshold" step="0.01" min="0"
+                        value="{{ .Config.ConsiderThreshold }}"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <div class="flex-1">
+                    <label class="filter-heading">Currency</label>
+                    <input type="text" name="currency" maxlength="3"
+                        value="{{ .Config.Currency }}"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+            </div>
+
+            <!-- Custom thresholds -->
+            <div class="filter-heading mb-2">Custom Thresholds</div>
+            <div id="thresholds-list" class="mb-3">
+                {{ template "settings_thresholds_partial.html" .PriceThresholds }}
+            </div>
+            <div class="flex gap-2 items-end">
+                <div class="flex-1">
+                    <label class="filter-heading">Label</label>
+                    <input type="text" id="new-threshold-label" placeholder="e.g. Budget"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <div class="w-28">
+                    <label class="filter-heading">Max Price ($)</label>
+                    <input type="number" id="new-threshold-price" step="0.01" min="0.01" placeholder="10.00"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <button type="button"
+                    hx-post="/settings/thresholds"
+                    hx-include="#new-threshold-label,#new-threshold-price"
+                    hx-vals='js:{"label": document.getElementById("new-threshold-label").value, "max_price": document.getElementById("new-threshold-price").value}'
+                    hx-target="#thresholds-list"
+                    hx-swap="innerHTML"
+                    hx-on::after-request="document.getElementById('new-threshold-label').value=''; document.getElementById('new-threshold-price').value='';"
+                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm rounded-lg transition shrink-0">
+                    Add
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Steam ──────────────────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">Steam</div>
+            <div class="flex flex-col gap-3">
+                <div>
+                    <label class="filter-heading">Steam ID (64-bit)</label>
+                    <input type="text" name="steam_user_id" value="{{ .Config.SteamUserID }}"
+                        placeholder="76561198…"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <div>
+                    <label class="filter-heading">API Key</label>
+                    <input type="password" name="steam_api_key"
+                        placeholder="{{ if .Config.SteamAPIKeySet }}(saved — leave blank to keep){{ else }}Steam Web API key{{ end }}"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+            </div>
+        </div>
+
+        <!-- ── IGDB ───────────────────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">IGDB (Twitch)</div>
+            <div class="flex flex-col gap-3">
+                <div>
+                    <label class="filter-heading">Client ID</label>
+                    <input type="text" name="igdb_client_id" value="{{ .Config.IGDBClientID }}"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <div>
+                    <label class="filter-heading">Client Secret</label>
+                    <input type="password" name="igdb_client_secret"
+                        placeholder="{{ if .Config.IGDBClientSecretSet }}(saved — leave blank to keep){{ else }}Client secret{{ end }}"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+            </div>
+        </div>
+
+        <!-- ── GG.deals ───────────────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">GG.deals</div>
+            <p class="text-xs text-gray-500 mb-3">Used for wishlist pricing — covers retail stores and keyshops in one API call. Generate a key at <a href="https://gg.deals/settings/" class="text-amber-400 hover:underline" target="_blank">gg.deals/settings</a>.</p>
+            <div>
+                <label class="filter-heading">API Key</label>
+                <input type="password" name="ggdeals_api_key"
+                    placeholder="{{ if .Config.GGDealsAPIKeySet }}(saved — leave blank to keep){{ else }}GG.deals API key{{ end }}"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+            </div>
+        </div>
+
+        <!-- ── RAWG ───────────────────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">RAWG</div>
+            <div>
+                <label class="filter-heading">API Key</label>
+                <input type="password" name="rawg_api_key"
+                    placeholder="{{ if .Config.RAWGAPIKeySet }}(saved — leave blank to keep){{ else }}RAWG API key{{ end }}"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+            </div>
+        </div>
+
+        <!-- ── ITAD ───────────────────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">IsThereAnyDeal</div>
+            <div>
+                <label class="filter-heading">API Key</label>
+                <input type="password" name="itad_api_key"
+                    placeholder="{{ if .Config.ITADAPIKeySet }}(saved — leave blank to keep){{ else }}ITAD API key{{ end }}"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+            </div>
+        </div>
+
+        <!-- ── GOG ────────────────────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">GOG</div>
+
+            <!-- Token status -->
+            {{ if eq .Config.GOGTokenStatus "valid" }}
+            <p class="text-xs text-green-400 mb-3">✓ Token valid until {{ .Config.GOGTokenExpiry }}</p>
+            {{ else if eq .Config.GOGTokenStatus "expired" }}
+            <p class="text-xs text-red-400 mb-3">⚠ Token expired (was valid until {{ .Config.GOGTokenExpiry }}) — re-push from Steam Deck</p>
+            {{ else }}
+            <p class="text-xs text-gray-500 mb-3">Not configured.</p>
+            {{ end }}
+
+            <!-- Curl push (recommended) -->
+            <p class="filter-heading mb-1">Push from Steam Deck (recommended)</p>
+            <p class="text-xs text-gray-500 mb-2">Run this on Praxis — Heroic keeps the token fresh automatically:</p>
+            <pre class="text-xs bg-gray-900 rounded p-3 overflow-x-auto text-gray-300 mb-4 select-all">curl -X POST http://{{ .Host }}/auth/gog/push --data-binary @/home/deck/.var/app/com.heroicgameslauncher.hgl/config/heroic/gog_store/auth.json</pre>
+
+            <!-- Manual paste fallback -->
+            <details>
+                <summary class="text-xs text-amber-400 cursor-pointer hover:text-amber-300 mb-2">Or paste auth.json manually</summary>
+                <div class="mt-2 flex flex-col gap-2">
+                    <textarea id="gog-token" name="code" rows="4"
+                        placeholder="Paste the full contents of auth.json here…"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-500 font-mono resize-none"></textarea>
+                    <button type="button"
+                        hx-post="/auth/gog/exchange"
+                        hx-include="#gog-token"
+                        hx-target="#gog-status"
+                        hx-swap="innerHTML"
+                        class="self-start px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold text-sm rounded-lg transition">
+                        Save &amp; Verify
+                    </button>
+                </div>
+            </details>
+            <div id="gog-status" class="mt-2 text-sm"></div>
+        </div>
+
+        <!-- ── Paths ──────────────────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">Library File Paths</div>
+            <div>
+                <label class="filter-heading">Heroic Library Directory</label>
+                <input type="text" name="heroic_library_path" value="{{ .Config.HeroicLibraryPath }}"
+                    placeholder="./store_library_files"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <p class="text-xs text-gray-600 mt-1">Directory containing legendary_library.json, gog_library.json, nile_library.json</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button type="submit"
+                class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                Save Settings
+            </button>
+            <span id="save-status" class="text-sm self-center"></span>
+        </div>
+
+    </form>
+
+    <!-- ── Access / Auth ─────────────────────────────────────── -->
+    <form hx-post="/settings/password" hx-target="#auth-status" hx-swap="innerHTML" class="px-6 pb-6 flex flex-col gap-6 max-w-xl">
+        <div class="sync-card">
+            <div class="sync-card-title">Access</div>
+            <p class="text-xs text-gray-500 mb-4">
+                Set a password to protect the app with HTTP Basic Auth. The browser will prompt once per session.
+                {{ if .Config.PasswordSet }}<span class="text-green-400">Password is set.</span>{{ else }}<span class="text-amber-400">No password set — app is unprotected.</span>{{ end }}
+            </p>
+            <div class="flex flex-col gap-3">
+                <div>
+                    <label class="filter-heading">New Password</label>
+                    <input type="password" name="password"
+                        placeholder="Leave blank to keep current password"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <div>
+                    <label class="filter-heading">Session Timeout (hours)</label>
+                    <input type="number" name="session_hours" min="1" max="720"
+                        value="{{ .Config.SessionHours }}"
+                        class="w-40 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                    <p class="text-xs text-gray-600 mt-1">How long before the browser prompts for credentials again.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 mt-4">
+                <button type="submit"
+                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm rounded-lg transition">
+                    Save Access Settings
+                </button>
+                <button type="button"
+                    hx-post="/logout"
+                    hx-target="body"
+                    class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-gray-400 hover:text-red-400 rounded-lg transition">
+                    Log Out
+                </button>
+                <span id="auth-status" class="text-sm self-center"></span>
+            </div>
+        </div>
+    </form>
+</div>
+{{ end }}

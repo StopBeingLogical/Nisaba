@@ -1,0 +1,67 @@
+{{ define "game_grid_partial.html" }}
+<div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
+    {{ range . }}
+    <a href="/library/{{ .ID }}" class="group relative rounded-lg overflow-hidden bg-gray-800 hover:ring-2 hover:ring-amber-400 transition">
+
+        <!-- Portrait cover -->
+        {{ if .Artwork.Square.URL }}
+        <img src="{{ .Artwork.Square.URL | proxyURL }}"
+             alt="{{ .Title }}"
+             class="w-full aspect-[2/3] object-cover" />
+        {{ else }}
+        <div class="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-gray-500 text-xs text-center p-2">
+            {{ .Title }}
+        </div>
+        {{ end }}
+
+        <!-- Overlay on hover -->
+        <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-2">
+            <div class="text-xs font-medium truncate">{{ .Title }}</div>
+        </div>
+
+        <!-- Store badges (bottom left) -->
+        <div class="absolute bottom-1 left-1 flex gap-0.5">
+            {{ range .OwnedStores }}
+            <span class="store-badge store-{{ . }}"></span>
+            {{ end }}
+        </div>
+
+        <!-- Status indicators (top right) -->
+        <div class="absolute top-1 right-1 flex flex-col gap-0.5 items-end">
+            {{ if .IsFavorite }}
+            <span class="indicator-dot bg-amber-400" title="Favourite"></span>
+            {{ end }}
+            {{ if eq .SteamDeckVerified "verified" }}
+            <span class="deck-badge deck-verified" title="Steam Deck Verified"></span>
+            {{ else if eq .SteamDeckVerified "playable" }}
+            <span class="deck-badge deck-playable" title="Steam Deck Playable"></span>
+            {{ else if eq .SteamDeckVerified "unsupported" }}
+            <span class="deck-badge deck-unsupported" title="Steam Deck Unsupported"></span>
+            {{ end }}
+            {{ if eq .ProtonRating "platinum" }}
+            <span class="proton-badge proton-platinum" title="ProtonDB: Platinum"></span>
+            {{ else if eq .ProtonRating "gold" }}
+            <span class="proton-badge proton-gold" title="ProtonDB: Gold"></span>
+            {{ else if eq .ProtonRating "silver" }}
+            <span class="proton-badge proton-silver" title="ProtonDB: Silver"></span>
+            {{ else if eq .ProtonRating "bronze" }}
+            <span class="proton-badge proton-bronze" title="ProtonDB: Bronze"></span>
+            {{ else if eq .ProtonRating "borked" }}
+            <span class="proton-badge proton-borked" title="ProtonDB: Borked"></span>
+            {{ else if eq .ProtonRating "native" }}
+            <span class="proton-badge proton-native" title="ProtonDB: Native"></span>
+            {{ end }}
+            {{ if .HasSeparateDLC }}
+            <span class="indicator-dot bg-blue-400" title="Has DLC"></span>
+            {{ end }}
+            {{ if .MultiStoreOwned }}
+            <span class="indicator-dot bg-purple-400" title="Owned on multiple stores"></span>
+            {{ end }}
+        </div>
+
+    </a>
+    {{ else }}
+    <div class="col-span-full text-center text-gray-500 py-16">No games found.</div>
+    {{ end }}
+</div>
+{{ end }}

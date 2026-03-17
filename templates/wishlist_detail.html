@@ -1,0 +1,237 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}{{ .Entry.Title }} — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto">
+
+    <!-- ── Hero banner ───────────────────────────────────────────── -->
+    <div class="relative h-48 bg-gray-900 overflow-hidden shrink-0">
+        {{ if .Entry.Artwork.Background.URL }}
+        <img src="{{ .Entry.Artwork.Background.URL | proxyURL }}"
+             alt=""
+             class="absolute inset-0 w-full h-full object-cover opacity-30" />
+        {{ end }}
+        <div class="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/80 to-transparent"></div>
+
+        <div class="relative flex items-end gap-6 h-full px-6 pb-4">
+            <!-- Cover art -->
+            <div class="shrink-0 w-24 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/10">
+                {{ if .Entry.Artwork.Square.URL }}
+                <img src="{{ .Entry.Artwork.Square.URL | proxyURL }}" alt="{{ .Entry.Title }}" class="w-full aspect-square object-cover" />
+                {{ else }}
+                <div class="w-full aspect-square bg-gray-700 flex items-center justify-center text-gray-500 text-xs text-center p-1">
+                    {{ .Entry.Title }}
+                </div>
+                {{ end }}
+            </div>
+
+            <!-- Title block -->
+            <div class="flex-1 min-w-0">
+                <h1 class="text-2xl font-bold truncate">{{ .Entry.Title }}</h1>
+                <div class="flex items-center gap-3 mt-1 text-sm text-gray-400">
+                    <span class="badge badge-{{ .Entry.EnrichmentStatus }}">{{ .Entry.EnrichmentStatus }}</span>
+                    {{ if .Entry.LibraryID.Valid }}
+                    <span class="text-amber-400 font-semibold">✓ Owned</span>
+                    {{ end }}
+                    {{ if .Entry.SteamDeckVerified }}
+                    {{ if eq .Entry.SteamDeckVerified "verified" }}
+                    <span class="flex items-center gap-1"><span class="indicator-dot bg-green-400"></span><span class="text-xs">Deck Verified</span></span>
+                    {{ else if eq .Entry.SteamDeckVerified "playable" }}
+                    <span class="flex items-center gap-1"><span class="indicator-dot bg-yellow-400"></span><span class="text-xs">Deck Playable</span></span>
+                    {{ end }}
+                    {{ end }}
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-2 shrink-0">
+                <a href="/wishlist" class="text-gray-500 hover:text-gray-300 text-sm">← Wishlist</a>
+
+                <button
+                    hx-post="/wishlist/{{ .Entry.ID }}/purchased"
+                    hx-confirm="Mark {{ .Entry.Title }} as purchased and remove from wishlist?"
+                    class="px-3 py-1.5 text-xs bg-green-700 hover:bg-green-600 rounded-lg text-gray-100 transition">
+                    {{ if .Entry.LibraryID.Valid }}View in Library{{ else }}Mark Purchased{{ end }}
+                </button>
+
+                <button
+                    hx-post="/wishlist/{{ .Entry.ID }}/remove"
+                    hx-confirm="Remove {{ .Entry.Title }} from your wishlist?"
+                    class="px-3 py-1.5 text-xs bg-gray-700 hover:bg-red-900 rounded-lg text-gray-400 hover:text-gray-200 transition">
+                    Remove
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Body ──────────────────────────────────────────────────── -->
+    <div class="flex flex-1 gap-6 p-6 overflow-hidden">
+
+        <!-- Left column: pricing + stores + library link -->
+        <div class="flex flex-col gap-4 w-72 shrink-0">
+
+            <!-- Price history sparkline -->
+            {{ if .PriceHistory }}
+            <div class="sync-card">
+                <div class="sync-card-title">Price History</div>
+                <div class="flex items-end gap-3">
+                    {{ sparkline .PriceHistory }}
+                    <div class="text-xs text-gray-500">
+                        <div>{{ len .PriceHistory }} data points</div>
+                        <div class="text-gray-600">Oldest → newest</div>
+                    </div>
+                </div>
+            </div>
+            {{ end }}
+
+            <!-- Pricing -->
+            <div class="sync-card">
+                <div class="sync-card-title">Pricing</div>
+                {{ if .Entry.BestCurrentPrice.Valid }}
+                <div class="flex items-baseline justify-between mb-3">
+                    <span class="text-xl font-bold {{ priceClass .Entry.BestCurrentPrice.Float64 0 }}">
+                        ${{ printf "%.2f" .Entry.BestCurrentPrice.Float64 }}
+                    </span>
+                    <span class="text-xs text-gray-500">{{ storeShortLabel .Entry.BestCurrentStore.String }}</span>
+                </div>
+                {{ if .Entry.HistoricalLowPrice.Valid }}
+                <div class="flex items-center justify-between text-xs text-gray-500 border-t border-gray-800 pt-2">
+                    <span>Historical low</span>
+                    <span class="text-gray-400">${{ printf "%.2f" .Entry.HistoricalLowPrice.Float64 }}<span class="text-gray-600 ml-1">{{ storeShortLabel .Entry.HistoricalLowStore.String }}</span></span>
+                </div>
+                {{ end }}
+                {{ if .Entry.TargetPrice.Valid }}
+                <div class="flex items-center justify-between text-xs mt-1.5">
+                    <span class="text-gray-500">Your target</span>
+                    <span class="text-amber-400">${{ printf "%.2f" .Entry.TargetPrice.Float64 }}</span>
+                </div>
+                {{ end }}
+                {{ if .Entry.LastPriceSync.Valid }}
+                <div class="text-xs text-gray-700 mt-2">Updated {{ .Entry.LastPriceSync.String }}</div>
+                {{ end }}
+                {{ else }}
+                <p class="text-xs text-gray-500 italic">No pricing data — may be unreleased or delisted</p>
+                {{ end }}
+            </div>
+
+            <!-- Store availability -->
+            {{ if .Stores }}
+            <div class="sync-card">
+                <div class="sync-card-title">Available On</div>
+                <div class="flex flex-col gap-2">
+                    {{ range .Stores }}
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="store-badge store-{{ .Store }}"></span>
+                        <span class="capitalize flex-1">{{ .Store }}</span>
+                        {{ if .StoreURL.Valid }}
+                        <a href="{{ .StoreURL.String }}" target="_blank" rel="noopener"
+                           class="text-xs px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-amber-400 rounded transition">
+                            View ↗
+                        </a>
+                        {{ end }}
+                    </div>
+                    {{ end }}
+                    {{ if .Entry.BestPriceURL.Valid }}
+                    <div class="flex items-center gap-2 text-sm pt-1 border-t border-gray-800">
+                        <span class="flex-1 text-gray-400 text-xs">Best price via</span>
+                        <a href="{{ .Entry.BestPriceURL.String }}" target="_blank" rel="noopener"
+                           class="text-xs px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 rounded transition font-medium">
+                            {{ storeShortLabel .Entry.BestCurrentStore.String }} ↗
+                        </a>
+                    </div>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+
+            <!-- Owned in library -->
+            {{ if .Entry.LibraryID.Valid }}
+            <div class="sync-card">
+                <div class="sync-card-title">In Your Library</div>
+                <p class="text-xs text-gray-400 mb-2">You already own this game.</p>
+                <a href="/library/{{ .Entry.LibraryID.String }}"
+                   class="text-sm text-amber-500 hover:text-amber-400">
+                    View library entry →
+                </a>
+            </div>
+            {{ end }}
+
+        </div>
+
+        <!-- Right column: user data form -->
+        <div class="flex-1 flex flex-col gap-4 min-w-0">
+
+            <div class="sync-card">
+                <div class="sync-card-title">My Wishlist Data</div>
+                <form hx-post="/wishlist/{{ .Entry.ID }}/user" hx-swap="none" class="flex flex-col gap-4">
+
+                    <div class="flex items-start gap-4 flex-wrap">
+                        <!-- Priority -->
+                        <div>
+                            <label class="filter-heading">Priority</label>
+                            <select name="priority" class="filter-select">
+                                <option value="0" {{ if eq .Entry.Priority 0 }}selected{{ end }}>None</option>
+                                <option value="1" {{ if eq .Entry.Priority 1 }}selected{{ end }}>Low</option>
+                                <option value="2" {{ if eq .Entry.Priority 2 }}selected{{ end }}>Medium</option>
+                                <option value="3" {{ if eq .Entry.Priority 3 }}selected{{ end }}>High</option>
+                            </select>
+                        </div>
+
+                        <!-- Preferred store -->
+                        <div>
+                            <label class="filter-heading">Preferred Store</label>
+                            <select name="preferred_store" class="filter-select">
+                                <option value="">— any —</option>
+                                <option value="steam"     {{ if eq .Entry.PreferredStore.String "steam"     }}selected{{ end }}>Steam</option>
+                                <option value="gog"       {{ if eq .Entry.PreferredStore.String "gog"       }}selected{{ end }}>GOG</option>
+                                <option value="epic"      {{ if eq .Entry.PreferredStore.String "epic"      }}selected{{ end }}>Epic</option>
+                                <option value="amazon"    {{ if eq .Entry.PreferredStore.String "amazon"    }}selected{{ end }}>Amazon</option>
+                                <option value="humble"    {{ if eq .Entry.PreferredStore.String "humble"    }}selected{{ end }}>Humble</option>
+                                <option value="fanatical" {{ if eq .Entry.PreferredStore.String "fanatical" }}selected{{ end }}>Fanatical</option>
+                            </select>
+                        </div>
+
+                        <!-- Target price -->
+                        <div>
+                            <label class="filter-heading">Target Price</label>
+                            <div class="flex items-center gap-1">
+                                <span class="text-sm text-gray-400">$</span>
+                                <input type="number" name="target_price" min="0" step="0.01"
+                                    value="{{ if .Entry.TargetPrice.Valid }}{{ printf "%.2f" .Entry.TargetPrice.Float64 }}{{ end }}"
+                                    placeholder="0.00"
+                                    class="w-24 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-amber-500" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="filter-heading">Notes</label>
+                        <textarea name="notes" rows="4"
+                            placeholder="Private notes…"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500 resize-none">{{ .Entry.Notes.String }}</textarea>
+                    </div>
+
+                    <button type="submit"
+                        class="self-start px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                        Save
+                    </button>
+                </form>
+            </div>
+
+            {{ if .Entry.Tags }}
+            <div class="sync-card">
+                <div class="sync-card-title">Tags</div>
+                <div class="flex flex-wrap gap-1">
+                    {{ range .Entry.Tags }}
+                    <span class="text-xs bg-gray-700 text-amber-400 px-2 py-0.5 rounded-full">{{ . }}</span>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+
+        </div>
+    </div>
+</div>
+{{ end }}

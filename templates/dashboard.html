@@ -1,0 +1,200 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Dashboard — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto p-6 gap-6">
+
+    <!-- ── Stats bar ─────────────────────────────────────────────── -->
+    <div class="grid grid-cols-4 gap-4">
+
+        <div class="sync-card text-center">
+            <div class="text-3xl font-bold text-amber-400">{{ .Stats.LibraryCount }}</div>
+            <div class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Library</div>
+        </div>
+
+        <div class="sync-card text-center">
+            <div class="text-3xl font-bold">{{ .Stats.WishlistCount }}</div>
+            <div class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Wishlist</div>
+        </div>
+
+        <div class="sync-card text-center">
+            <div class="text-3xl font-bold text-green-400">{{ .Stats.InstalledCount }}</div>
+            <div class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Installed</div>
+        </div>
+
+        <a href="/review" class="sync-card text-center block hover:border-amber-800 transition">
+            <div class="text-3xl font-bold {{ if gt .Stats.UnmatchedCount 0 }}text-amber-400{{ else }}text-gray-600{{ end }}">{{ .Stats.UnmatchedCount }}</div>
+            <div class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Unmatched</div>
+        </a>
+
+    </div>
+
+    <!-- ── Price alerts ───────────────────────────────────────────── -->
+    <div class="sync-card">
+        <div class="sync-card-title flex items-center gap-2">
+            Price Alerts
+            {{ if .PriceAlerts }}
+            <span class="text-xs font-normal text-amber-400">{{ len .PriceAlerts }} items at or below threshold</span>
+            {{ end }}
+        </div>
+        {{ if .PriceAlerts }}
+        <div class="flex flex-col -mx-1">
+            {{ range .PriceAlerts }}
+            <a href="/wishlist/{{ .ID }}"
+               class="flex items-center gap-3 py-2 px-1 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 rounded transition">
+                <div class="shrink-0 w-9 h-9 rounded-lg overflow-hidden bg-gray-700">
+                    {{ if .Artwork.Square.URL }}
+                    <img src="{{ .Artwork.Square.URL }}" alt="{{ .Title }}" class="w-full h-full object-cover" />
+                    {{ end }}
+                </div>
+                <span class="flex-1 text-sm truncate">{{ .Title }}</span>
+                {{ if .BestCurrentPrice.Valid }}
+                <span class="text-sm font-bold {{ priceClass .BestCurrentPrice.Float64 0 }} shrink-0">
+                    ${{ printf "%.2f" .BestCurrentPrice.Float64 }}
+                </span>
+                <span class="text-xs text-gray-500 shrink-0 text-right">{{ storeShortLabel .BestCurrentStore.String }}</span>
+                {{ end }}
+                {{ if .TargetPrice.Valid }}
+                <span class="text-xs text-gray-600 shrink-0">target ${{ printf "%.2f" .TargetPrice.Float64 }}</span>
+                {{ end }}
+            </a>
+            {{ end }}
+        </div>
+        {{ else }}
+        <p class="text-sm text-gray-600">No games at or below your thresholds right now.</p>
+        {{ end }}
+    </div>
+
+    <!-- ── Two-column: Near historical low + High priority ───────── -->
+    <div class="grid grid-cols-2 gap-4">
+
+        <!-- Near historical low -->
+        <div class="sync-card">
+            <div class="sync-card-title">
+                Near Historical Low
+                <span class="text-xs font-normal text-gray-500 ml-1">within 10%</span>
+            </div>
+            {{ if .NearHistoricalLow }}
+            <div class="flex flex-col">
+                {{ range .NearHistoricalLow }}
+                <a href="/wishlist/{{ .ID }}"
+                   class="flex items-center gap-3 py-1.5 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 -mx-5 px-5 transition">
+                    <div class="shrink-0 w-8 h-8 rounded overflow-hidden bg-gray-700">
+                        {{ if .Artwork.Square.URL }}
+                        <img src="{{ .Artwork.Square.URL }}" alt="{{ .Title }}" class="w-full h-full object-cover" />
+                        {{ end }}
+                    </div>
+                    <span class="flex-1 text-sm truncate">{{ .Title }}</span>
+                    <div class="text-right shrink-0">
+                        {{ if .BestCurrentPrice.Valid }}
+                        <div class="text-sm font-medium text-gray-200">${{ printf "%.2f" .BestCurrentPrice.Float64 }}</div>
+                        {{ if .HistoricalLowPrice.Valid }}
+                        <div class="text-xs text-gray-600">low ${{ printf "%.2f" .HistoricalLowPrice.Float64 }}</div>
+                        {{ end }}
+                        {{ end }}
+                    </div>
+                </a>
+                {{ end }}
+            </div>
+            {{ else }}
+            <p class="text-sm text-gray-600">No games near their historical low right now.</p>
+            {{ end }}
+        </div>
+
+        <!-- High priority wishlist -->
+        <div class="sync-card">
+            <div class="sync-card-title">High Priority</div>
+            {{ if .HighPriority }}
+            <div class="flex flex-col">
+                {{ range .HighPriority }}
+                <a href="/wishlist/{{ .ID }}"
+                   class="flex items-center gap-3 py-1.5 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 -mx-5 px-5 transition">
+                    <div class="shrink-0 w-8 h-8 rounded overflow-hidden bg-gray-700">
+                        {{ if .Artwork.Square.URL }}
+                        <img src="{{ .Artwork.Square.URL }}" alt="{{ .Title }}" class="w-full h-full object-cover" />
+                        {{ end }}
+                    </div>
+                    <span class="flex-1 text-sm truncate">{{ .Title }}</span>
+                    {{ if .BestCurrentPrice.Valid }}
+                    <span class="text-sm font-medium {{ priceClass .BestCurrentPrice.Float64 0 }} shrink-0">
+                        ${{ printf "%.2f" .BestCurrentPrice.Float64 }}
+                    </span>
+                    {{ else }}
+                    <span class="text-xs text-gray-600 shrink-0 italic">no price</span>
+                    {{ end }}
+                </a>
+                {{ end }}
+            </div>
+            {{ else }}
+            <p class="text-sm text-gray-600">
+                No high-priority wishlist items. Set priority on a
+                <a href="/wishlist" class="text-amber-500 hover:text-amber-400">wishlist entry</a> to see it here.
+            </p>
+            {{ end }}
+        </div>
+
+    </div>
+
+    <!-- ── To be removed ─────────────────────────────────────────── -->
+    {{ if .FlaggedForRemoval }}
+    <div class="sync-card border-red-900/40">
+        <div class="sync-card-title flex items-center gap-2">
+            To Be Removed
+            <span class="text-xs font-normal text-red-400">{{ len .FlaggedForRemoval }} flagged</span>
+        </div>
+        <div class="flex flex-col">
+            {{ range .FlaggedForRemoval }}
+            <div class="flex items-center gap-3 py-2 border-b border-gray-800 last:border-0 -mx-5 px-5">
+                <div class="shrink-0 w-9 h-9 rounded-lg overflow-hidden bg-gray-700">
+                    {{ if .Artwork.Square.URL }}
+                    <img src="{{ .Artwork.Square.URL }}" alt="{{ .Title }}" class="w-full h-full object-cover" />
+                    {{ end }}
+                </div>
+                <a href="/wishlist/{{ .ID }}" class="flex-1 text-sm truncate hover:text-amber-400 transition">{{ .Title }}</a>
+                <form hx-post="/wishlist/{{ .ID }}/remove" hx-confirm="Remove {{ .Title }} from wishlist?" hx-swap="none">
+                    <button type="submit" class="text-xs text-red-400 hover:text-red-300 transition px-2 py-1 rounded hover:bg-red-900/30">
+                        Remove
+                    </button>
+                </form>
+                <label class="text-xs text-gray-600 hover:text-gray-400 cursor-pointer transition" title="Unflag">
+                    <input type="checkbox" checked
+                        hx-post="/wishlist/{{ .ID }}/flag-remove"
+                        hx-trigger="change"
+                        hx-swap="none"
+                        class="sr-only" />
+                    ✕ unflag
+                </label>
+            </div>
+            {{ end }}
+        </div>
+    </div>
+    {{ end }}
+
+    <!-- ── Recent sync activity ───────────────────────────────────── -->
+    {{ if .RecentSyncs }}
+    <div class="sync-card">
+        <div class="sync-card-title">Recent Sync Activity</div>
+        <div class="flex flex-col">
+            {{ range .RecentSyncs }}
+            <div class="flex items-center gap-3 text-sm py-1.5 border-b border-gray-800 last:border-0">
+                <span class="w-20 text-gray-400 shrink-0 capitalize">{{ .Type }}</span>
+                <span class="flex-1 flex items-center gap-2">
+                    {{ if eq .Status "done" }}<span class="text-green-400">✓</span>
+                    {{ else if eq .Status "failed" }}<span class="text-red-400">✗</span>
+                    {{ else if eq .Status "running" }}<span class="text-amber-400">⟳</span>
+                    {{ end }}
+                    <span class="text-xs text-gray-500 capitalize">{{ .Status }}</span>
+                    {{ if .GamesAdded.Valid }}<span class="text-gray-500 text-xs">+{{ .GamesAdded.Int64 }} added</span>{{ end }}
+                    {{ if .GamesUpdated.Valid }}<span class="text-gray-500 text-xs">{{ .GamesUpdated.Int64 }} updated</span>{{ end }}
+                    {{ if .ErrorMessage.Valid }}<span class="text-red-400 text-xs">{{ .ErrorMessage.String }}</span>{{ end }}
+                </span>
+                <span class="text-xs text-gray-600 shrink-0">{{ .StartedAt | formatTime }}</span>
+            </div>
+            {{ end }}
+        </div>
+    </div>
+    {{ end }}
+
+</div>
+{{ end }}

@@ -1,0 +1,19 @@
+{{ define "settings_thresholds_partial.html" }}
+<div class="flex flex-col gap-2">
+    {{ range . }}
+    <div class="flex items-center gap-3 py-1.5 border-b border-gray-800 last:border-0">
+        <span class="text-sm flex-1">{{ .Label }}</span>
+        <span class="text-sm text-amber-400 font-medium w-16 text-right">&le; ${{ printf "%.2f" .MaxPrice }}</span>
+        <button type="button"
+            hx-post="/settings/thresholds/{{ .ID }}/delete"
+            hx-target="#thresholds-list"
+            hx-swap="innerHTML"
+            class="text-xs text-red-400 hover:text-red-300 px-2 py-0.5 rounded hover:bg-red-900/30 transition">
+            Remove
+        </button>
+    </div>
+    {{ else }}
+    <p class="text-sm text-gray-600">No custom thresholds yet.</p>
+    {{ end }}
+</div>
+{{ end }}

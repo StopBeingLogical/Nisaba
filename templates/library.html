@@ -1,0 +1,224 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Library — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+
+    <!-- ── Top bar ───────────────────────────────────────────── -->
+    <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-10">
+        <input
+            type="search"
+            name="q"
+            placeholder="Search library…"
+            class="flex-1 bg-gray-800 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 filter-input"
+            hx-get="/library"
+            hx-trigger="keyup changed delay:300ms"
+            hx-target="#game-grid"
+            hx-include=".filter-input"
+        />
+
+        <select name="sort" class="filter-select filter-input"
+            hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+            hx-include=".filter-input">
+            <option value="">A – Z</option>
+            <option value="added">Recently Added</option>
+            <option value="playtime">Most Played</option>
+            <option value="rating">Rating</option>
+        </select>
+
+        <span class="text-sm text-gray-500 shrink-0">{{ .TotalGames }} games</span>
+        <a href="/library/export?format=markdown"
+            class="shrink-0 bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1.5 rounded-lg text-sm transition-colors"
+            title="Download Markdown inventory">
+            Export MD
+        </a>
+        <a href="/library/export?format=json"
+            class="shrink-0 bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1.5 rounded-lg text-sm transition-colors"
+            title="Download JSON for LLM analysis">
+            Export JSON
+        </a>
+        <a href="/library/add"
+            class="shrink-0 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold px-3 py-1.5 rounded-lg text-sm transition-colors">
+            + Add Game
+        </a>
+    </div>
+
+    <!-- ── Sidebar + Grid ────────────────────────────────────── -->
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- Filter sidebar -->
+        <aside id="filter-sidebar" class="shrink-0 p-4 overflow-y-auto flex flex-col gap-5" style="width:176px">
+
+            <!-- Quick filters -->
+            <div>
+                <div class="filter-heading">Quick</div>
+                <label class="filter-row">
+                    <input type="checkbox" name="installed" value="1"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>Installed</span>
+                </label>
+                <label class="filter-row">
+                    <input type="checkbox" name="favorites" value="1"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>Favorites</span>
+                </label>
+            </div>
+
+            <!-- Platform -->
+            <div>
+                <div class="filter-heading">Platform</div>
+                <label class="filter-row">
+                    <input type="radio" name="platform" value="" checked
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>All</span>
+                </label>
+                <label class="filter-row">
+                    <input type="radio" name="platform" value="windows"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>Windows</span>
+                </label>
+                <label class="filter-row">
+                    <input type="radio" name="platform" value="mac"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>Mac</span>
+                </label>
+                <label class="filter-row">
+                    <input type="radio" name="platform" value="linux"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>Linux</span>
+                </label>
+            </div>
+
+            <!-- Store -->
+            <div>
+                <div class="filter-heading">Store</div>
+                <label class="filter-row">
+                    <input type="radio" name="store" value="" checked
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>All</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .TotalGames }}</span>
+                </label>
+                {{ range .StoreCounts }}
+                <label class="filter-row">
+                    <input type="radio" name="store" value="{{ .Store }}"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span class="capitalize">{{ .Store }}</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .Count }}</span>
+                </label>
+                {{ end }}
+            </div>
+
+            <!-- Play status -->
+            <div>
+                <div class="filter-heading">Status</div>
+                <label class="filter-row">
+                    <input type="radio" name="play_status" value="" checked
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>All</span>
+                </label>
+                {{ range .StatusCounts }}
+                <label class="filter-row">
+                    <input type="radio" name="play_status" value="{{ .Value }}"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>{{ .Label }}</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .Count }}</span>
+                </label>
+                {{ end }}
+            </div>
+
+            <!-- Steam Deck -->
+            {{ if .SteamDeckCounts }}
+            <div>
+                <div class="filter-heading">Steam Deck</div>
+                <label class="filter-row">
+                    <input type="radio" name="steam_deck" value="" checked
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>All</span>
+                </label>
+                {{ range .SteamDeckCounts }}
+                <label class="filter-row">
+                    <input type="radio" name="steam_deck" value="{{ .Value }}"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>{{ .Label }}</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .Count }}</span>
+                </label>
+                {{ end }}
+            </div>
+            {{ end }}
+
+            <!-- Genres -->
+            {{ if .TopGenres }}
+            <div>
+                <div class="filter-heading">Genres</div>
+                {{ range .TopGenres }}
+                <label class="filter-row">
+                    <input type="checkbox" name="genre" value="{{ .Genre }}"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>{{ .Genre }}</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .Count }}</span>
+                </label>
+                {{ end }}
+            </div>
+            {{ end }}
+
+            <!-- Tags -->
+            {{ if .Tags }}
+            <div>
+                <div class="filter-heading">Tags</div>
+                {{ range .Tags }}
+                <label class="filter-row">
+                    <input type="checkbox" name="tag" value="{{ . }}"
+                        class="filter-input"
+                        hx-get="/library" hx-trigger="change" hx-target="#game-grid"
+                        hx-include=".filter-input" />
+                    <span>{{ . }}</span>
+                </label>
+                {{ end }}
+            </div>
+            {{ end }}
+
+        </aside>
+
+        <!-- Filter resize handle -->
+        <div id="filter-handle" class="resize-handle" title="Drag to resize"></div>
+
+        <!-- Game grid -->
+        <div id="game-grid" class="flex-1 overflow-y-auto p-6">
+            {{ template "game_grid_partial.html" .Games }}
+        </div>
+
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initResize('filter-handle', 'filter-sidebar', 'nisaba.filterW', 176, 120, 320);
+});
+</script>
+{{ end }}

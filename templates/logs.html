@@ -1,0 +1,124 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Logs — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto">
+    <div class="px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-10 flex items-center gap-4">
+        <h1 class="text-lg font-semibold">Logs</h1>
+        <span class="text-xs text-gray-500">Sync activity and per-item errors</span>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- ── Left: recent sync runs ─────────────────────────── -->
+        <div class="w-56 shrink-0 border-r border-gray-800 overflow-y-auto p-3 flex flex-col gap-1">
+            <div class="text-xs text-gray-500 uppercase tracking-wide px-2 mb-1">Recent Runs</div>
+            {{ range .RecentRuns }}
+            <div class="text-xs px-2 py-1.5 rounded-lg {{ if eq .Status "done" }}text-gray-400{{ else if eq .Status "failed" }}text-red-400{{ else }}text-amber-400{{ end }}">
+                <div class="flex items-center gap-1.5">
+                    {{ if eq .Status "done" }}<span class="text-green-500">✓</span>
+                    {{ else if eq .Status "failed" }}<span class="text-red-500">✗</span>
+                    {{ else }}<span class="text-amber-400">⟳</span>{{ end }}
+                    <span class="capitalize font-medium">{{ .Type }}</span>
+                </div>
+                <div class="text-gray-600 mt-0.5">{{ .StartedAt | formatTime }}</div>
+                {{ if .GamesAdded.Valid }}<div class="text-gray-600">+{{ .GamesAdded.Int64 }} added</div>{{ end }}
+                {{ if .ErrorMessage.Valid }}<div class="text-red-400/70 truncate" title="{{ .ErrorMessage.String }}">{{ .ErrorMessage.String }}</div>{{ end }}
+            </div>
+            {{ else }}
+            <div class="text-xs text-gray-600 px-2">No sync runs yet.</div>
+            {{ end }}
+        </div>
+
+        <!-- ── Right: console + error log ───────────────────── -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+
+            <!-- Console output -->
+            <div class="border-b border-gray-800">
+                <div class="flex items-center justify-between px-4 py-2 bg-gray-900/50">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Console Output</span>
+                    <div class="flex items-center gap-2">
+                        <a href="/logs?mode=human{{ if .TypeFilter }}&type={{ .TypeFilter }}{{ end }}"
+                           class="text-xs px-2 py-0.5 rounded transition {{ if eq .ConsoleMode "human" }}bg-amber-500/20 text-amber-400{{ else }}text-gray-500 hover:text-gray-300{{ end }}">
+                            Humanized
+                        </a>
+                        <a href="/logs?mode=raw{{ if .TypeFilter }}&type={{ .TypeFilter }}{{ end }}"
+                           class="text-xs px-2 py-0.5 rounded transition {{ if eq .ConsoleMode "raw" }}bg-amber-500/20 text-amber-400{{ else }}text-gray-500 hover:text-gray-300{{ end }}">
+                            Raw
+                        </a>
+                    </div>
+                </div>
+                <div id="console-log"
+                     hx-get="/logs/console?mode={{ .ConsoleMode }}"
+                     hx-trigger="every 3s"
+                     hx-swap="innerHTML"
+                     class="max-h-56 overflow-y-auto px-4 py-2 bg-gray-950/50 font-mono">
+                    {{ .ConsoleHTML }}
+                </div>
+            </div>
+
+            <!-- Type filter tabs -->
+            <div class="flex items-center gap-1 px-4 py-2 border-b border-gray-800 bg-gray-900/50 flex-wrap">
+                <a href="/logs"
+                   class="px-3 py-1 rounded-lg text-xs font-medium transition {{ if eq .TypeFilter "" }}bg-amber-500/20 text-amber-400 border border-amber-500/30{{ else }}text-gray-400 hover:text-gray-200 hover:bg-gray-800{{ end }}">
+                    All
+                </a>
+                {{ $tf := .TypeFilter }}
+                {{ range .ErrorTypes }}
+                <a href="/logs?type={{ . }}"
+                   class="px-3 py-1 rounded-lg text-xs font-medium transition capitalize {{ if eq . $tf }}bg-amber-500/20 text-amber-400 border border-amber-500/30{{ else }}text-gray-400 hover:text-gray-200 hover:bg-gray-800{{ end }}">
+                    {{ . }}
+                </a>
+                {{ end }}
+            </div>
+
+            <!-- Error list -->
+            <div class="flex-1 overflow-y-auto p-4">
+                {{ if .ErrorLog }}
+                <table class="w-full text-xs font-mono border-collapse">
+                    <thead>
+                        <tr class="text-gray-600 text-left border-b border-gray-800">
+                            <th class="pb-2 pr-4 font-normal w-36">Time</th>
+                            <th class="pb-2 pr-4 font-normal w-20">Type</th>
+                            <th class="pb-2 font-normal">Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ $prevRun := "" }}{{ range .ErrorLog }}
+                        {{ if ne .RunID $prevRun }}
+                        <tr>
+                            <td colspan="3" class="pt-3 pb-1 text-gray-700 text-xs font-sans not-italic border-t border-gray-800/60 first:border-0">
+                                — {{ .RunID }} —
+                            </td>
+                        </tr>
+                        {{ end }}
+                        {{ $prevRun = .RunID }}
+                        <tr class="hover:bg-gray-900/50 group">
+                            <td class="py-0.5 pr-4 text-gray-600 whitespace-nowrap">{{ .CreatedAt | formatTime }}</td>
+                            <td class="py-0.5 pr-4">
+                                <span class="px-1.5 py-0.5 rounded text-gray-300 capitalize
+                                    {{ if eq .SyncType "pricing" }}bg-blue-500/15
+                                    {{ else if eq .SyncType "proton" }}bg-purple-500/15
+                                    {{ else if eq .SyncType "deck" }}bg-green-500/15
+                                    {{ else if eq .SyncType "wishlist" }}bg-amber-500/15
+                                    {{ else }}bg-gray-700/50{{ end }}">
+                                    {{ .SyncType }}
+                                </span>
+                            </td>
+                            <td class="py-0.5 text-red-300/80 break-all">{{ .Message }}</td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+                {{ else }}
+                <div class="flex items-center justify-center h-full text-gray-600 text-sm">
+                    {{ if .TypeFilter }}No errors logged for "{{ .TypeFilter }}".{{ else }}No errors logged yet.{{ end }}
+                </div>
+                {{ end }}
+            </div>
+
+        </div>
+    </div>
+</div>
+{{ end }}

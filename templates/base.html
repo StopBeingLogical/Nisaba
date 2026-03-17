@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ block "title" . }}NISABA{{ end }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/htmx.min.js"></script>
+</head>
+<body class="h-full bg-gray-950 text-gray-100 flex">
+
+    <!-- ── Sidebar ───────────────────────────────────────────── -->
+    <nav id="nav-sidebar" class="shrink-0 flex flex-col bg-gray-900 p-4 gap-1" style="width:224px">
+        <div class="text-xl font-bold tracking-widest text-amber-400 mb-6 px-2">NISABA</div>
+
+        <a href="/"         class="nav-link {{ if eq .Page "dashboard" }}active{{ end }}">Dashboard</a>
+        <a href="/library"  class="nav-link {{ if eq .Page "library"  }}active{{ end }}">Library</a>
+        <a href="/wishlist" class="nav-link {{ if eq .Page "wishlist" }}active{{ end }}">Wishlist</a>
+        <a href="/review"   class="nav-link {{ if eq .Page "review"   }}active{{ end }}">
+            Review Queue
+            {{ if gt .NeedsReview 0 }}
+            <span class="ml-auto text-xs bg-amber-500 text-gray-950 rounded-full px-1.5">{{ .NeedsReview }}</span>
+            {{ end }}
+        </a>
+        <a href="/sync"     class="nav-link {{ if eq .Page "sync"     }}active{{ end }}">Sync</a>
+        <a href="/logs"     class="nav-link {{ if eq .Page "logs"     }}active{{ end }}">Logs</a>
+
+        <div class="mt-auto">
+            <a href="/settings" class="nav-link {{ if eq .Page "settings" }}active{{ end }}">Settings</a>
+        </div>
+    </nav>
+
+    <!-- ── Nav resize handle ─────────────────────────────────── -->
+    <div id="nav-handle" class="resize-handle" title="Drag to resize"></div>
+
+    <!-- ── Main content ──────────────────────────────────────── -->
+    <main class="flex-1 overflow-hidden">
+        {{ block "content" . }}{{ end }}
+    </main>
+
+    <!-- ── Login modal ───────────────────────────────────────── -->
+    <div id="login-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
+            <h2 class="text-lg font-semibold mb-1">Sign In</h2>
+            <p class="text-xs text-gray-500 mb-5">This action requires authentication.</p>
+            <form id="login-form"
+                hx-post="/auth/login"
+                hx-target="#login-error"
+                hx-swap="innerHTML"
+                class="flex flex-col gap-3">
+                <input type="text" name="username" placeholder="Username" autocomplete="username"
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <input type="password" name="password" placeholder="Password" autocomplete="current-password"
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <p id="login-error" class="text-xs text-red-400 min-h-[1rem]"></p>
+                <div class="flex gap-2 mt-1">
+                    <button type="submit"
+                        class="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold text-sm rounded-lg transition">
+                        Sign In
+                    </button>
+                    <button type="button" onclick="hideLoginModal()"
+                        class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm rounded-lg transition">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<script>
+function showLoginModal() {
+    document.getElementById('login-error').textContent = '';
+    document.getElementById('login-form').reset();
+    document.getElementById('login-modal').classList.remove('hidden');
+    document.querySelector('#login-modal input[name="username"]').focus();
+}
+function hideLoginModal() {
+    document.getElementById('login-modal').classList.add('hidden');
+}
+
+// Close on backdrop click
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('login-modal').addEventListener('click', function(e) {
+        if (e.target === this) hideLoginModal();
+    });
+    // Auto-open after redirect from a protected page.
+    if (new URLSearchParams(window.location.search).get('login') === '1') {
+        showLoginModal();
+        history.replaceState(null, '', window.location.pathname);
+    }
+});
+
+// HTMX events
+document.addEventListener('showLoginModal', showLoginModal);
+document.addEventListener('loginSuccess', function() {
+    hideLoginModal();
+    window.location.reload();
+});
+document.addEventListener('loginError', function(e) {
+    document.getElementById('login-error').textContent = e.detail?.value || 'Incorrect credentials.';
+});
+
+function initResize(handleId, panelId, storageKey, defaultW, minW, maxW) {
+    const handle = document.getElementById(handleId);
+    const panel  = document.getElementById(panelId);
+    if (!handle || !panel) return;
+    const stored = localStorage.getItem(storageKey);
+    panel.style.width = (stored ? +stored : defaultW) + 'px';
+    handle.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startW = panel.offsetWidth;
+        function onMove(e) {
+            const w = Math.max(minW, Math.min(maxW, startW + e.clientX - startX));
+            panel.style.width = w + 'px';
+        }
+        function onUp() {
+            localStorage.setItem(storageKey, panel.offsetWidth);
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    initResize('nav-handle', 'nav-sidebar', 'nisaba.navW', 224, 140, 360);
+});
+</script>
+</body>
+</html>

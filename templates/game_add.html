@@ -1,0 +1,204 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Add Game — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto">
+    <div class="px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-10 flex items-center gap-4">
+        <a href="/library" class="text-gray-500 hover:text-gray-300 text-sm">← Library</a>
+        <h1 class="text-lg font-semibold">Add Game Manually</h1>
+    </div>
+
+    <div class="p-6 max-w-2xl flex flex-col gap-6">
+
+        <!-- ── Search ─────────────────────────────────────────────────────── -->
+        {{ if .IGDBConfigured }}
+        <div>
+            <div class="filter-heading mb-2">Search IGDB</div>
+            <div class="flex gap-2">
+                <input id="search-input" type="text" placeholder="Game title…"
+                    class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();doSearch()}" />
+                <button type="button" onclick="doSearch()"
+                    class="bg-gray-700 hover:bg-gray-600 text-gray-100 px-4 py-2 rounded-lg text-sm transition-colors">
+                    Search
+                </button>
+            </div>
+            <div id="search-status" class="text-xs text-gray-500 mt-1 h-4"></div>
+
+            <!-- Results -->
+            <div id="search-results" class="mt-2 flex flex-col gap-2"></div>
+        </div>
+        {{ else }}
+        <div class="text-sm text-gray-500 bg-gray-900 border border-gray-800 rounded-lg px-4 py-3">
+            IGDB is not configured — fill in the fields manually or configure credentials in
+            <a href="/settings" class="text-amber-400 hover:underline">Settings</a>.
+        </div>
+        {{ end }}
+
+        <!-- ── Selected game preview ──────────────────────────────────────── -->
+        <div id="selected-preview" class="hidden flex gap-4 items-start bg-gray-900 border border-amber-700 rounded-lg p-4">
+            <img id="preview-cover" src="" alt="" class="w-20 rounded shrink-0 object-cover" />
+            <div class="flex flex-col gap-1 min-w-0">
+                <div id="preview-title" class="font-semibold text-amber-300"></div>
+                <div id="preview-year" class="text-xs text-gray-400"></div>
+                <button type="button" onclick="clearSelection()"
+                    class="text-xs text-gray-500 hover:text-gray-300 mt-1 text-left">
+                    ✕ Clear selection
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Form ───────────────────────────────────────────────────────── -->
+        <form method="POST" action="/library/add" class="flex flex-col gap-5">
+            <input type="hidden" name="igdb_id" id="f-igdb-id" value="" />
+            <input type="hidden" name="cover_url" id="f-cover-url" value="" />
+
+            <!-- Title -->
+            <div>
+                <label class="filter-heading">Title <span class="text-red-400">*</span></label>
+                <input type="text" name="title" id="f-title" required
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500 mt-1" />
+            </div>
+
+            <!-- Developer -->
+            <div>
+                <label class="filter-heading">Developer</label>
+                <input type="text" name="developer" id="f-developer"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500 mt-1" />
+            </div>
+
+            <!-- Release Date -->
+            <div>
+                <label class="filter-heading">Release Date</label>
+                <input type="date" name="release_date" id="f-release-date"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500 mt-1" />
+            </div>
+
+            <!-- Platforms -->
+            <div>
+                <div class="filter-heading mb-2">Platforms</div>
+                <div class="flex gap-6">
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" name="windows" value="1" checked class="accent-amber-500" /> Windows
+                    </label>
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" name="mac" value="1" class="accent-amber-500" /> Mac
+                    </label>
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" name="linux" value="1" class="accent-amber-500" /> Linux
+                    </label>
+                </div>
+            </div>
+
+            <!-- Store -->
+            <div>
+                <div class="filter-heading mb-2">Store</div>
+                <div class="flex gap-3 flex-wrap">
+                    <select name="store"
+                        class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500">
+                        <option value="">— none —</option>
+                        <option value="steam">Steam</option>
+                        <option value="gog">GOG</option>
+                        <option value="epic">Epic</option>
+                        <option value="ea">EA App</option>
+                        <option value="ubisoft">Ubisoft Connect</option>
+                        <option value="amazon">Amazon</option>
+                    </select>
+                    <input type="text" name="store_id" placeholder="Store ID (optional)"
+                        class="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <input type="text" name="store_url" placeholder="Store URL (optional)"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500 mt-2" />
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label class="filter-heading">Description</label>
+                <textarea name="description" id="f-description" rows="4"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500 mt-1 resize-y"></textarea>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-3">
+                <button type="submit"
+                    class="bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold px-5 py-2 rounded-lg text-sm transition-colors">
+                    Add Game
+                </button>
+                <a href="/library"
+                    class="px-5 py-2 rounded-lg text-sm text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 transition-colors">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function doSearch() {
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) return;
+    const status = document.getElementById('search-status');
+    const resultsEl = document.getElementById('search-results');
+    status.textContent = 'Searching…';
+    resultsEl.innerHTML = '';
+    try {
+        const resp = await fetch('/library/search?q=' + encodeURIComponent(q));
+        if (!resp.ok) {
+            status.textContent = resp.status === 503 ? 'IGDB not configured.' : 'Search failed.';
+            return;
+        }
+        const results = await resp.json();
+        status.textContent = results.length ? results.length + ' result' + (results.length > 1 ? 's' : '') : 'No results found.';
+        resultsEl.innerHTML = results.map(g => `
+            <button type="button" onclick='selectGame(${JSON.stringify(g)})'
+                class="flex gap-3 items-center w-full text-left bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-amber-700 rounded-lg p-3 transition-colors group">
+                ${g.cover_url
+                    ? `<img src="${g.cover_url}" alt="" class="w-12 rounded shrink-0 object-cover" />`
+                    : `<div class="w-12 h-16 rounded bg-gray-800 shrink-0"></div>`}
+                <div class="flex flex-col gap-0.5 min-w-0">
+                    <div class="text-sm font-medium text-gray-100 group-hover:text-amber-300 truncate">${escHtml(g.name)}</div>
+                    <div class="text-xs text-gray-500">${g.release_date ? g.release_date.slice(0,4) : '—'}</div>
+                </div>
+            </button>
+        `).join('');
+    } catch (e) {
+        status.textContent = 'Search error.';
+    }
+}
+
+function selectGame(g) {
+    document.getElementById('f-igdb-id').value = g.igdb_id;
+    document.getElementById('f-cover-url').value = g.cover_url || '';
+    document.getElementById('f-title').value = g.name;
+    document.getElementById('f-release-date').value = g.release_date || '';
+    document.getElementById('f-description').value = g.description || '';
+
+    const preview = document.getElementById('selected-preview');
+    document.getElementById('preview-title').textContent = g.name;
+    document.getElementById('preview-year').textContent = g.release_date ? g.release_date.slice(0,4) : '';
+    const coverImg = document.getElementById('preview-cover');
+    if (g.cover_url) {
+        coverImg.src = g.cover_url;
+        coverImg.classList.remove('hidden');
+    } else {
+        coverImg.classList.add('hidden');
+    }
+    preview.classList.remove('hidden');
+
+    document.getElementById('search-results').innerHTML = '';
+    document.getElementById('search-status').textContent = '';
+    document.getElementById('f-title').focus();
+}
+
+function clearSelection() {
+    document.getElementById('f-igdb-id').value = '';
+    document.getElementById('f-cover-url').value = '';
+    document.getElementById('selected-preview').classList.add('hidden');
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{{ end }}

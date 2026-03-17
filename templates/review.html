@@ -1,0 +1,101 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Review Queue — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto">
+    <div class="px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-10 flex items-center gap-3">
+        <h1 class="text-lg font-semibold">Review Queue</h1>
+        <span class="text-sm text-gray-500">{{ .TotalNeedsReview }} total</span>
+        {{ if .TotalNeedsReview }}
+        <span class="text-sm text-gray-600">· showing {{ .PageStart }}–{{ .PageEnd }}</span>
+        {{ end }}
+    </div>
+
+    <!-- Explanation -->
+    <div class="px-6 py-4 bg-gray-900/50 border-b border-gray-800 text-sm text-gray-400 max-w-2xl">
+        <p>These games couldn't be automatically matched to the IGDB database during enrichment — usually because the title was ambiguous or not found.</p>
+        <ul class="mt-2 flex flex-col gap-1 text-xs text-gray-500 list-disc list-inside">
+            <li><strong class="text-gray-300">Search</strong> for the correct IGDB entry, then click <strong class="text-amber-400">Match</strong> to link it and queue metadata enrichment (cover art, tags, etc.).</li>
+            <li><strong class="text-gray-300">Skip</strong> removes it from this queue permanently without matching — useful for games you don't need metadata for, or that aren't in IGDB.</li>
+            <li>Owned games appear here if they were imported before enrichment completed.</li>
+        </ul>
+    </div>
+
+    <div class="p-6 flex flex-col gap-3 max-w-2xl">
+        {{ range .Entries }}
+        <div class="sync-card flex items-start gap-4" id="card-{{ .ID }}">
+
+            <!-- Artwork -->
+            <div class="shrink-0 w-16 rounded-lg overflow-hidden">
+                {{ if .Artwork.Square.URL }}
+                <img src="{{ .Artwork.Square.URL }}" alt="{{ .Title }}" class="w-full aspect-square object-cover" />
+                {{ else }}
+                <div class="w-full aspect-square bg-gray-700 flex items-center justify-center text-gray-500 text-xs text-center p-1">{{ .Title }}</div>
+                {{ end }}
+            </div>
+
+            <!-- Title + store info -->
+            <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm">{{ .Title }}</div>
+                <div class="text-xs text-gray-500 mt-0.5">{{ .StoreInfo }}</div>
+
+                <!-- Search for IGDB match -->
+                <div class="mt-3">
+                    <div class="flex gap-2">
+                        <input type="text" value="{{ .Title }}"
+                            id="q-{{ .ID }}"
+                            class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-amber-500"
+                            placeholder="Search IGDB…"
+                            name="q"
+                            hx-get="/review/{{ .ID }}/search"
+                            hx-trigger="keyup changed delay:400ms"
+                            hx-target="#results-{{ .ID }}"
+                        />
+                        <button
+                            hx-get="/review/{{ .ID }}/search"
+                            hx-include="#q-{{ .ID }}"
+                            hx-target="#results-{{ .ID }}"
+                            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition shrink-0">
+                            Search
+                        </button>
+                    </div>
+                    <div id="results-{{ .ID }}" class="mt-2 flex flex-col gap-1"></div>
+                </div>
+            </div>
+
+            <!-- Skip -->
+            <button
+                hx-post="/review/{{ .ID }}/skip"
+                hx-target="#card-{{ .ID }}"
+                hx-swap="outerHTML"
+                class="shrink-0 text-xs text-gray-600 hover:text-red-400 mt-1 px-2 py-1 rounded hover:bg-red-950/30 transition">
+                Skip
+            </button>
+
+        </div>
+        {{ else }}
+        <div class="text-center text-gray-500 py-16">
+            All games matched. Nothing to review.
+        </div>
+        {{ end }}
+
+        <!-- Pagination -->
+        {{ if .TotalNeedsReview }}
+        <div class="flex items-center justify-between pt-4 border-t border-gray-800 mt-2">
+            {{ if .HasPrev }}
+            <a href="/review?offset={{ .PrevOffset }}" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition">← Previous</a>
+            {{ else }}
+            <span></span>
+            {{ end }}
+            <span class="text-xs text-gray-600">{{ .PageStart }}–{{ .PageEnd }} of {{ .TotalNeedsReview }}</span>
+            {{ if .HasNext }}
+            <a href="/review?offset={{ .NextOffset }}" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition">Next →</a>
+            {{ else }}
+            <span></span>
+            {{ end }}
+        </div>
+        {{ end }}
+    </div>
+</div>
+{{ end }}

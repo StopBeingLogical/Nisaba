@@ -1,0 +1,79 @@
+{{ define "wishlist_grid_partial.html" }}
+<div class="flex flex-col gap-2">
+    {{ range . }}
+    <div class="flex items-center gap-2 group/row">
+
+        <!-- Flag-for-removal checkbox -->
+        <label class="shrink-0 flex items-center cursor-pointer px-1" title="Flag for removal">
+            <input type="checkbox"
+                {{ if .FlagRemove }}checked{{ end }}
+                hx-post="/wishlist/{{ .ID }}/flag-remove"
+                hx-trigger="change"
+                hx-swap="none"
+                class="accent-red-400 w-3.5 h-3.5 cursor-pointer" />
+        </label>
+
+        <!-- Main row link -->
+        <a href="/wishlist/{{ .ID }}"
+           class="flex flex-1 items-center gap-4 p-3 bg-gray-900 hover:bg-gray-800 rounded-xl border {{ if .FlagRemove }}border-red-500/40{{ else if .IsDuplicate }}border-orange-500/40{{ else }}border-gray-800 hover:border-gray-700{{ end }} transition group">
+
+            <!-- Cover art -->
+            <div class="shrink-0 w-12 h-12 rounded-lg overflow-hidden">
+                {{ if .Artwork.Square.URL }}
+                <img src="{{ .Artwork.Square.URL | proxyURL }}" alt="{{ .Title }}" class="w-full h-full object-cover" />
+                {{ else }}
+                <div class="w-full h-full bg-gray-700 flex items-center justify-center text-gray-500 text-xs text-center p-1">{{ .Title }}</div>
+                {{ end }}
+            </div>
+
+            <!-- Title + meta -->
+            <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm truncate group-hover:text-amber-400 transition">{{ .Title }}</div>
+                <div class="flex items-center gap-2 mt-0.5">
+                    {{ if eq .SteamDeckVerified "verified" }}
+                    <span class="deck-badge deck-verified" title="Steam Deck Verified"></span>
+                    {{ else if eq .SteamDeckVerified "playable" }}
+                    <span class="deck-badge deck-playable" title="Steam Deck Playable"></span>
+                    {{ else if eq .SteamDeckVerified "unsupported" }}
+                    <span class="deck-badge deck-unsupported" title="Steam Deck Unsupported"></span>
+                    {{ end }}
+                    {{ if .LibraryID.Valid }}
+                    <span class="text-xs text-amber-500 font-medium">Owned</span>
+                    {{ end }}
+                    {{ if .IsDuplicate }}
+                    <span class="text-xs px-1.5 py-0.5 bg-orange-500/15 text-orange-400 rounded font-medium">Duplicate</span>
+                    {{ end }}
+                    {{ range .Stores }}
+                    <span class="store-badge store-{{ . }}"></span>
+                    {{ end }}
+                </div>
+            </div>
+
+            <!-- Pricing -->
+            <div class="text-right shrink-0">
+                {{ if .BestCurrentPrice.Valid }}
+                <div class="text-sm {{ priceClass .BestCurrentPrice.Float64 0 }}">
+                    ${{ printf "%.2f" .BestCurrentPrice.Float64 }}
+                </div>
+                <div class="text-xs text-gray-500">{{ storeShortLabel .BestCurrentStore.String }}</div>
+                {{ if .HistoricalLowPrice.Valid }}
+                <div class="text-xs text-gray-600 mt-0.5">Low: ${{ printf "%.2f" .HistoricalLowPrice.Float64 }}</div>
+                {{ end }}
+                {{ else }}
+                <div class="text-xs text-gray-600 italic">Not listed</div>
+                <div class="text-xs text-gray-700">May be unreleased</div>
+                {{ end }}
+            </div>
+
+            <!-- Priority indicator -->
+            {{ if gt .Priority 0 }}
+            <div class="shrink-0 w-1 h-8 rounded-full {{ priorityColor .Priority }}"></div>
+            {{ end }}
+
+        </a>
+    </div>
+    {{ else }}
+    <div class="text-center text-gray-500 py-16">No wishlist entries found.</div>
+    {{ end }}
+</div>
+{{ end }}

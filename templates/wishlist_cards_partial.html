@@ -1,0 +1,61 @@
+{{ define "wishlist_cards_partial.html" }}
+<div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
+    {{ range . }}
+    <a href="/wishlist/{{ .ID }}"
+       class="group flex flex-col rounded-xl overflow-hidden bg-gray-900 border {{ if .FlagRemove }}border-red-500/40{{ else if .IsDuplicate }}border-orange-500/40{{ else }}border-gray-800 hover:border-amber-500/60{{ end }} hover:bg-gray-800 transition">
+
+        <!-- Cover art -->
+        <div class="relative w-full aspect-[2/3] shrink-0 overflow-hidden bg-gray-800">
+            {{ if .Artwork.Square.URL }}
+            <img src="{{ .Artwork.Square.URL | proxyURL }}" alt="{{ .Title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            {{ else }}
+            <div class="w-full h-full flex items-center justify-center text-gray-500 text-xs text-center p-3">{{ .Title }}</div>
+            {{ end }}
+
+            <!-- Priority bar (left edge) -->
+            {{ if gt .Priority 0 }}
+            <div class="absolute top-0 left-0 w-1 h-full {{ priorityColor .Priority }}"></div>
+            {{ end }}
+
+            <!-- Badges (top right) -->
+            <div class="absolute top-1.5 right-1.5 flex flex-col gap-0.5 items-end">
+                {{ if .LibraryID.Valid }}
+                <span class="text-xs px-1 bg-amber-500/90 text-gray-950 rounded font-semibold leading-4">✓</span>
+                {{ end }}
+                {{ if eq .SteamDeckVerified "verified" }}
+                <span class="deck-badge deck-verified" title="Steam Deck Verified"></span>
+                {{ else if eq .SteamDeckVerified "playable" }}
+                <span class="deck-badge deck-playable" title="Steam Deck Playable"></span>
+                {{ else if eq .SteamDeckVerified "unsupported" }}
+                <span class="deck-badge deck-unsupported" title="Steam Deck Unsupported"></span>
+                {{ end }}
+            </div>
+
+            <!-- Store badges (bottom left) -->
+            <div class="absolute bottom-1.5 left-1.5 flex gap-0.5 flex-wrap">
+                {{ range .Stores }}
+                <span class="store-badge store-{{ . }}"></span>
+                {{ end }}
+            </div>
+        </div>
+
+        <!-- Caption -->
+        <div class="p-2 flex flex-col gap-0.5 min-w-0">
+            <div class="text-xs font-medium leading-tight truncate group-hover:text-amber-400 transition">{{ .Title }}</div>
+            {{ if .BestCurrentPrice.Valid }}
+            <div class="text-sm font-semibold {{ priceClass .BestCurrentPrice.Float64 0 }}">${{ printf "%.2f" .BestCurrentPrice.Float64 }}</div>
+            <div class="text-xs text-gray-500 truncate">{{ storeShortLabel .BestCurrentStore.String }}</div>
+            {{ if .HistoricalLowPrice.Valid }}
+            <div class="text-xs text-gray-600">Low ${{ printf "%.2f" .HistoricalLowPrice.Float64 }}</div>
+            {{ end }}
+            {{ else }}
+            <div class="text-xs text-gray-600 italic">Not listed</div>
+            {{ end }}
+        </div>
+
+    </a>
+    {{ else }}
+    <div class="col-span-full text-center text-gray-500 py-16">No wishlist entries found.</div>
+    {{ end }}
+</div>
+{{ end }}

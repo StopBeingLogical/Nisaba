@@ -1,0 +1,57 @@
+{{ define "sync_status_partial.html" }}
+<div id="sync-status"
+     {{ if .Running }}
+     hx-get="/sync/status"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML"
+     {{ end }}
+     class="sync-card">
+
+    <div class="sync-card-title flex items-center gap-2">
+        Status
+        {{ if .Running }}
+        <span class="htmx-indicator w-3 h-3 rounded-full bg-amber-400 animate-pulse inline-block"></span>
+        {{ end }}
+    </div>
+
+    {{ if .Running }}
+    <div class="text-sm text-amber-400">{{ .Message }}</div>
+    {{ if .Detail }}<div class="text-xs text-gray-500 mt-1">{{ .Detail }}</div>{{ end }}
+    {{ if .Step }}
+    <div class="mt-3">
+        <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
+            <span>{{ .Step }}</span>
+            {{ if gt .StepTotal 0 }}
+            <span class="text-gray-500 tabular-nums">{{ .StepDone }} / {{ .StepTotal }}</span>
+            {{ end }}
+        </div>
+        {{ if gt .StepTotal 0 }}
+        <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+            <div class="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
+                 style="width: {{ .StepPct }}%"></div>
+        </div>
+        {{ end }}
+    </div>
+    {{ end }}
+    {{ if .Progress }}<div class="text-xs text-gray-500 mt-1">{{ .Progress }}</div>{{ end }}
+    {{ else if .LastMessage }}
+    <div class="text-sm text-gray-400">{{ .LastMessage }}</div>
+    {{ if .LastFinished }}<div class="text-xs text-gray-600 mt-1">Finished {{ .LastFinished }}</div>{{ end }}
+    {{ if .Errors }}
+    <details class="mt-3">
+        <summary class="text-xs text-red-400 cursor-pointer select-none hover:text-red-300 transition">
+            {{ len .Errors }} errors — click to expand
+        </summary>
+        <div class="mt-2 max-h-48 overflow-y-auto flex flex-col gap-0.5 pr-1">
+            {{ range .Errors }}
+            <div class="text-xs text-red-300/70 font-mono leading-snug">{{ . }}</div>
+            {{ end }}
+        </div>
+    </details>
+    {{ end }}
+    {{ else }}
+    <div class="text-sm text-gray-600">No sync in progress.</div>
+    {{ end }}
+
+</div>
+{{ end }}

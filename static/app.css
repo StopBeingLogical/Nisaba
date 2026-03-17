@@ -1,0 +1,219 @@
+/* NISABA — Application Styles
+   Tailwind CDN is used for utilities; custom components defined here. */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --color-bg:       #030712;
+    --color-surface:  #111827;
+    --color-border:   #1f2937;
+    --color-text:     #f9fafb;
+    --color-muted:    #6b7280;
+    --color-accent:   #f59e0b;
+}
+
+html, body    { height: 100%; font-family: 'Inter', sans-serif; background: var(--color-bg); color: var(--color-text); }
+a             { color: inherit; text-decoration: none; }
+
+/* ── Navigation ──────────────────────────────────────────── */
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+    transition: background 0.15s, color 0.15s;
+}
+.nav-link:hover { background: #1f2937; color: #f9fafb; }
+.nav-link.active { background: #1f2937; color: #f59e0b; font-weight: 600; }
+
+/* ── Resize handles ──────────────────────────────────────── */
+.resize-handle {
+    width: 4px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: var(--color-border);
+    transition: background 0.15s;
+    user-select: none;
+}
+.resize-handle:hover, .resize-handle:active { background: var(--color-accent); }
+
+/* ── Filter controls ─────────────────────────────────────── */
+.filter-select {
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #f9fafb;
+    outline: none;
+    cursor: pointer;
+}
+.filter-select:focus { border-color: #f59e0b; }
+
+.filter-heading {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.filter-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: #d1d5db;
+    padding: 0.25rem 0;
+    cursor: pointer;
+}
+.filter-row:hover { color: #f9fafb; }
+.filter-row input[type="checkbox"],
+.filter-row input[type="radio"] { accent-color: #f59e0b; }
+
+/* ── Store badges ────────────────────────────────────────── */
+.store-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background-size: 14px 14px;
+    background-repeat: no-repeat;
+    background-position: center;
+    font-size: 0;
+}
+.store-steam {
+    background-color: #1b2838;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fsteam%2Fc7d5e0');
+}
+.store-gog {
+    background-color: #86328a;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fgogdotcom%2Fffffff');
+}
+.store-epic {
+    background-color: #2d2d2d;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fepicgames%2Fffffff');
+}
+.store-amazon {
+    background-color: #232f3e;
+    font-size: 7px;
+    font-weight: 800;
+    color: #ff9900;
+    letter-spacing: -0.5px;
+}
+.store-amazon::after { content: "AMZ"; }
+.store-humble {
+    background-color: #cc2929;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fhumblebundle%2Fffffff');
+}
+.store-ea {
+    background-color: #ff4747;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fea%2Fffffff');
+}
+.store-ubisoft {
+    background-color: #0074e4;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fubisoft%2Fffffff');
+}
+/* Fanatical not in Simple Icons — use a text abbreviation */
+.store-fanatical {
+    background-color: #e4000f;
+    font-size: 7px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+}
+.store-fanatical::after { content: "FAN"; }
+
+/* ── Indicator dots ──────────────────────────────────────── */
+.indicator-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+/* ── Steam Deck status badges ────────────────────────────── */
+.deck-badge {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    background-size: 11px 11px;
+    background-repeat: no-repeat;
+    background-position: center;
+    font-size: 0;
+}
+.deck-verified   { background-color: rgba(74,222,128,0.18); background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fsteamdeck%2F4ade80'); border: 1px solid rgba(74,222,128,0.35); }
+.deck-playable   { background-color: rgba(250,204,21,0.18);  background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fsteamdeck%2Ffacc15'); border: 1px solid rgba(250,204,21,0.35); }
+.deck-unsupported{ background-color: rgba(248,113,113,0.18); background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fsteamdeck%2Ff87171'); border: 1px solid rgba(248,113,113,0.35); }
+
+/* ── ProtonDB rating badges ──────────────────────────────── */
+.proton-badge {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    background-size: 11px 11px;
+    background-repeat: no-repeat;
+    background-position: center;
+    font-size: 0;
+}
+.proton-platinum { background-color: rgba(226,232,240,0.18); background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fprotondb%2Fe2e8f0'); border: 1px solid rgba(226,232,240,0.30); }
+.proton-gold     { background-color: rgba(251,191,36,0.18);  background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fprotondb%2Ffbbf24'); border: 1px solid rgba(251,191,36,0.30); }
+.proton-silver   { background-color: rgba(156,163,175,0.18); background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fprotondb%2F9ca3af'); border: 1px solid rgba(156,163,175,0.30); }
+.proton-bronze   { background-color: rgba(205,127,50,0.18);  background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fprotondb%2Fcd7f32'); border: 1px solid rgba(205,127,50,0.30); }
+.proton-borked   { background-color: rgba(248,113,113,0.18); background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fprotondb%2Ff87171'); border: 1px solid rgba(248,113,113,0.30); }
+.proton-native   { background-color: rgba(167,139,250,0.18); background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fprotondb%2Fa78bfa'); border: 1px solid rgba(167,139,250,0.30); }
+
+/* ── Price threshold indicators ──────────────────────────── */
+.price-instant { color: #34d399; font-weight: 700; }
+.price-consider { color: #fbbf24; font-weight: 600; }
+.price-normal   { color: #f9fafb; }
+
+/* ── Enrichment status badges ───────────────────────────── */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.badge-matched      { background: #064e3b; color: #34d399; }
+.badge-scraped      { background: #1e3a5f; color: #60a5fa; }
+.badge-needs-review { background: #78350f; color: #fbbf24; }
+.badge-manual       { background: #312e81; color: #a5b4fc; }
+
+/* ── Sync status cards ───────────────────────────────────── */
+.sync-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+}
+.sync-card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+/* ── HTMX loading indicator ──────────────────────────────── */
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator { display: inline-block; }
+.htmx-request.htmx-indicator  { display: inline-block; }
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4b5563; }

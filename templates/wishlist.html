@@ -1,0 +1,266 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Wishlist — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+
+    <!-- ── Top bar ───────────────────────────────────────────── -->
+    <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-10">
+        <input
+            type="search"
+            name="q"
+            placeholder="Search wishlist…"
+            class="flex-1 bg-gray-800 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 filter-input"
+            hx-get="/wishlist"
+            hx-trigger="keyup changed delay:300ms"
+            hx-target="#wishlist-grid"
+            hx-include=".filter-input"
+        />
+
+        <select name="sort" class="filter-select filter-input"
+            hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+            hx-include=".filter-input">
+            <option value="priority">Priority</option>
+            <option value="price_asc">Price ↑</option>
+            <option value="price_desc">Price ↓</option>
+            <option value="store_group">Group by Store</option>
+            <option value="alpha">A–Z</option>
+            <option value="added">Date Added</option>
+        </select>
+
+        <!-- View toggle -->
+        <div class="flex shrink-0 bg-gray-800 rounded-lg p-0.5 gap-0.5">
+            <button id="view-list-btn" onclick="setWishlistView('list')" title="List view"
+                class="px-2 py-1 rounded text-sm transition">&#9776;</button>
+            <button id="view-grid-btn" onclick="setWishlistView('grid')" title="Grid view"
+                class="px-2 py-1 rounded text-sm transition">&#9783;</button>
+        </div>
+
+        <!-- Hidden view input included with all filter requests -->
+        <input type="hidden" id="view-input" name="view" value="{{ .View }}" class="filter-input"
+            hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid" hx-include=".filter-input" />
+
+        <span class="text-sm text-gray-500 shrink-0">{{ .TotalEntries }} games</span>
+
+        <button onclick="document.getElementById('wishlist-add-panel').classList.toggle('hidden')"
+            class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-sm rounded-lg transition shrink-0">
+            + Add Game
+        </button>
+    </div>
+
+    <!-- ── Add game panel (hidden by default) ────────────────── -->
+    <div id="wishlist-add-panel" class="hidden border-b border-gray-800 bg-gray-900 px-6 py-4">
+        <div class="max-w-lg">
+            <div class="filter-heading mb-2">Search IGDB to add a game</div>
+            <input
+                type="search"
+                name="q"
+                placeholder="Type a game title…"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500 mb-3"
+                hx-get="/wishlist/search"
+                hx-trigger="keyup changed delay:400ms"
+                hx-target="#wishlist-add-results"
+            />
+            <div id="wishlist-add-results" class="flex flex-col gap-1"></div>
+        </div>
+    </div>
+
+    <!-- ── Sidebar + Grid ────────────────────────────────────── -->
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- Filter sidebar -->
+        <aside id="filter-sidebar" class="shrink-0 p-4 overflow-y-auto flex flex-col gap-5" style="width:176px">
+
+            <!-- Priority -->
+            <div>
+                <div class="filter-heading">Priority</div>
+                <label class="filter-row">
+                    <input type="radio" name="priority" value="" checked
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>All</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .TotalEntries }}</span>
+                </label>
+                {{ range .PriorityCounts }}
+                <label class="filter-row">
+                    <input type="radio" name="priority" value="{{ .Value }}"
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>{{ .Label }}</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .Count }}</span>
+                </label>
+                {{ end }}
+            </div>
+
+            <!-- Steam Deck -->
+            {{ if .DeckCounts }}
+            <div>
+                <div class="filter-heading">Steam Deck</div>
+                <label class="filter-row">
+                    <input type="radio" name="steam_deck" value="" checked
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>All</span>
+                </label>
+                {{ range .DeckCounts }}
+                <label class="filter-row">
+                    <input type="radio" name="steam_deck" value="{{ .Value }}"
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>{{ .Label }}</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .Count }}</span>
+                </label>
+                {{ end }}
+            </div>
+            {{ end }}
+
+            <!-- Store -->
+            {{ if .StoreCounts }}
+            <div>
+                <div class="filter-heading">Store</div>
+                <label class="filter-row">
+                    <input type="radio" name="store" value="" checked
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>All</span>
+                </label>
+                {{ range .StoreCounts }}
+                <label class="filter-row">
+                    <input type="radio" name="store" value="{{ .Value }}"
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span class="capitalize">{{ .Label }}</span>
+                    <span class="ml-auto text-gray-500 text-xs">{{ .Count }}</span>
+                </label>
+                {{ end }}
+            </div>
+            {{ end }}
+
+            <!-- Best price at -->
+            {{ if .BestStoreCounts }}
+            <div>
+                <div class="filter-heading">Best Price At</div>
+                <label class="filter-row">
+                    <input type="radio" name="best_store" value="" checked
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>All</span>
+                </label>
+                {{ range .BestStoreCounts }}
+                <label class="filter-row">
+                    <input type="radio" name="best_store" value="{{ .Value }}"
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span class="truncate">{{ storeShortLabel .Label }}</span>
+                    <span class="ml-auto text-gray-500 text-xs shrink-0">{{ .Count }}</span>
+                </label>
+                {{ end }}
+            </div>
+            {{ end }}
+
+            <!-- Price threshold -->
+            {{ if .PriceThresholds }}
+            <div>
+                <div class="filter-heading">Price ≤</div>
+                <label class="filter-row">
+                    <input type="radio" name="max_price" value="" checked
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>Any price</span>
+                </label>
+                {{ range .PriceThresholds }}
+                <label class="filter-row">
+                    <input type="radio" name="max_price" value="{{ printf "%.2f" .MaxPrice }}"
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>{{ .Label }}</span>
+                    <span class="ml-auto text-gray-500 text-xs shrink-0">${{ printf "%.2f" .MaxPrice }}</span>
+                </label>
+                {{ end }}
+            </div>
+            {{ end }}
+
+            <!-- Owned -->
+            <div>
+                <div class="filter-heading">Owned</div>
+                <label class="filter-row">
+                    <input type="checkbox" name="owned" value="1"
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>Already owned</span>
+                </label>
+            </div>
+
+            <!-- Duplicates -->
+            {{ if gt .DuplicateCount 0 }}
+            <div>
+                <div class="filter-heading">Duplicates</div>
+                <label class="filter-row">
+                    <input type="checkbox" name="duplicates" value="1"
+                        class="filter-input"
+                        hx-get="/wishlist" hx-trigger="change" hx-target="#wishlist-grid"
+                        hx-include=".filter-input" />
+                    <span>Show only</span>
+                    <span class="ml-auto text-orange-400 text-xs">{{ .DuplicateCount }}</span>
+                </label>
+            </div>
+            {{ end }}
+
+        </aside>
+
+        <!-- Filter resize handle -->
+        <div id="filter-handle" class="resize-handle" title="Drag to resize"></div>
+
+        <!-- Wishlist grid -->
+        <div id="wishlist-grid" class="flex-1 overflow-y-auto p-6">
+            {{ if eq .View "grid" }}
+            {{ template "wishlist_cards_partial.html" .Entries }}
+            {{ else }}
+            {{ template "wishlist_grid_partial.html" .Entries }}
+            {{ end }}
+        </div>
+
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initResize('filter-handle', 'filter-sidebar', 'nisaba.filterW', 176, 120, 320);
+
+    // Restore saved view preference
+    const saved = localStorage.getItem('nisaba.wishlistView');
+    if (saved && saved !== document.getElementById('view-input').value) {
+        setWishlistView(saved, false);
+    } else {
+        updateViewButtons(document.getElementById('view-input').value);
+    }
+});
+
+function setWishlistView(view, trigger) {
+    document.getElementById('view-input').value = view;
+    localStorage.setItem('nisaba.wishlistView', view);
+    updateViewButtons(view);
+    if (trigger !== false) {
+        htmx.trigger(document.getElementById('view-input'), 'change');
+    }
+}
+
+function updateViewButtons(view) {
+    const listBtn = document.getElementById('view-list-btn');
+    const gridBtn = document.getElementById('view-grid-btn');
+    listBtn.className = 'px-2 py-1 rounded text-sm transition ' + (view === 'list' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white');
+    gridBtn.className = 'px-2 py-1 rounded text-sm transition ' + (view === 'grid' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white');
+}
+</script>
+{{ end }}

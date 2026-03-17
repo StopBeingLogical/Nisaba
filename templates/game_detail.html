@@ -1,0 +1,277 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}{{ .Game.Title }} — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto">
+
+    <!-- ── Hero banner ───────────────────────────────────────────── -->
+    <div class="relative h-48 bg-gray-900 overflow-hidden shrink-0">
+        {{ if .Game.Artwork.Background.URL }}
+        <img src="{{ .Game.Artwork.Background.URL | proxyURL }}"
+             alt=""
+             class="absolute inset-0 w-full h-full object-cover opacity-30" />
+        {{ end }}
+        <div class="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/80 to-transparent"></div>
+
+        <div class="relative flex items-end gap-6 h-full px-6 pb-4">
+            <!-- Cover art -->
+            <div class="shrink-0 w-24 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/10">
+                {{ if .Game.Artwork.Square.URL }}
+                <img src="{{ .Game.Artwork.Square.URL | proxyURL }}" alt="{{ .Game.Title }}" class="w-full aspect-square object-cover" />
+                {{ else }}
+                <div class="w-full aspect-square bg-gray-700 flex items-center justify-center text-gray-500 text-xs text-center p-1">
+                    {{ .Game.Title }}
+                </div>
+                {{ end }}
+            </div>
+
+            <!-- Title block -->
+            <div class="flex-1 min-w-0">
+                <h1 class="text-2xl font-bold truncate">{{ .Game.Title }}</h1>
+                <div class="flex items-center gap-3 mt-1 text-sm text-gray-400">
+                    {{ if .Game.Developer }}<span>{{ .Game.Developer }}</span>{{ end }}
+                    {{ if .Game.Publisher }}<span class="text-gray-600">/ {{ .Game.Publisher }}</span>{{ end }}
+                    {{ if .Game.ReleaseDate }}<span class="text-gray-600">·</span><span>{{ .Game.ReleaseDate }}</span>{{ end }}
+                    {{ if .Game.PlayTimeDisplay }}<span class="text-gray-600">·</span><span class="text-gray-300">{{ .Game.PlayTimeDisplay }}</span>{{ end }}
+                    <span class="badge badge-{{ .Game.EnrichmentStatus }}">{{ .Game.EnrichmentStatus }}</span>
+                    {{ if eq .Game.EnrichmentStatus "needs_review" }}
+                    <a href="/review/{{ .Game.ID }}/search" class="text-amber-400 hover:text-amber-300 text-xs">Match on IGDB →</a>
+                    {{ end }}
+                </div>
+            </div>
+
+            <!-- Quick actions -->
+            <div class="flex items-center gap-2 shrink-0">
+                <a href="/library" class="text-gray-500 hover:text-gray-300 text-sm">← Library</a>
+                <button
+                    hx-post="/library/{{ .Game.ID }}/rehydrate"
+                    hx-target="#rehydrate-feedback"
+                    hx-swap="innerHTML"
+                    hx-confirm="Re-run enrichment for this game?"
+                    class="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300">
+                    Rehydrate
+                </button>
+                <span id="rehydrate-feedback" class="text-xs"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Body ──────────────────────────────────────────────────── -->
+    <div class="flex flex-1 gap-6 p-6 overflow-hidden">
+
+        <!-- Left column: metadata -->
+        <div class="flex flex-col gap-4 w-72 shrink-0">
+
+            <!-- Stores owned -->
+            <div class="sync-card">
+                <div class="sync-card-title">Owned On</div>
+                {{ if .Stores }}
+                <div class="flex flex-col gap-2">
+                    {{ range .Stores }}
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="store-badge store-{{ .Store }}"></span>
+                        <span class="capitalize">{{ .Store }}</span>
+                        {{ if .StoreURL }}
+                        <a href="{{ .StoreURL }}" target="_blank" class="ml-auto text-xs px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-amber-400 rounded transition">↗</a>
+                        {{ end }}
+                    </div>
+                    {{ end }}
+                </div>
+                {{ else }}
+                <p class="text-xs text-gray-500">No store data</p>
+                {{ end }}
+            </div>
+
+            <!-- Platform support -->
+            <div class="sync-card">
+                <div class="sync-card-title">Platform Support</div>
+                <div class="flex flex-col gap-1.5 text-sm">
+                    {{ if .Game.Windows }}<div class="flex items-center gap-2"><span class="indicator-dot bg-green-400"></span>Windows</div>{{ end }}
+                    {{ if .Game.Mac }}<div class="flex items-center gap-2"><span class="indicator-dot bg-green-400"></span>macOS</div>{{ end }}
+                    {{ if .Game.Linux }}<div class="flex items-center gap-2"><span class="indicator-dot bg-green-400"></span>Linux</div>{{ end }}
+                    {{ if .Game.SteamDeckVerified }}
+                    <div class="flex items-center gap-2">
+                        {{ if eq .Game.SteamDeckVerified "verified" }}
+                        <span class="indicator-dot bg-green-400"></span><span>Steam Deck Verified</span>
+                        {{ else if eq .Game.SteamDeckVerified "playable" }}
+                        <span class="indicator-dot bg-yellow-400"></span><span>Steam Deck Playable</span>
+                        {{ else if eq .Game.SteamDeckVerified "unsupported" }}
+                        <span class="indicator-dot bg-red-500"></span><span>Steam Deck Unsupported</span>
+                        {{ end }}
+                    </div>
+                    {{ end }}
+                    {{ if .Game.ProtonRating }}<div class="flex items-center gap-2 text-gray-400 text-xs ml-5">ProtonDB: {{ .Game.ProtonRating }}</div>{{ end }}
+                </div>
+            </div>
+
+            <!-- Install state -->
+            <div class="sync-card">
+                <div class="sync-card-title">Installed On</div>
+                {{ if .InstallSources }}
+                <div class="flex flex-col gap-2">
+                    {{ range .InstallSources }}
+                    <div class="text-sm">
+                        <div class="font-medium">{{ .DeviceLabel }}</div>
+                        {{ if .VolumeLabel }}<div class="text-xs text-gray-500">{{ .VolumeLabel }}</div>{{ end }}
+                        {{ if .InstallPath }}<div class="text-xs text-gray-600 truncate" title="{{ .InstallPath }}">{{ .InstallPath }}</div>{{ end }}
+                        {{ if .InstallSizeBytes }}<div class="text-xs text-gray-500">{{ .InstallSizeBytes | formatBytes }}</div>{{ end }}
+                    </div>
+                    {{ end }}
+                </div>
+                {{ else }}
+                <p class="text-xs text-gray-500">Not installed</p>
+                {{ end }}
+            </div>
+
+            <!-- Genres + Tags -->
+            {{ if .Game.Genres }}
+            <div class="sync-card">
+                <div class="sync-card-title">Genres</div>
+                <div class="flex flex-wrap gap-1">
+                    {{ range .Game.Genres }}
+                    <span class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">{{ . }}</span>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+
+            {{ if .Game.Tags }}
+            <div class="sync-card">
+                <div class="sync-card-title">Tags</div>
+                <div class="flex flex-wrap gap-1">
+                    {{ range .Game.Tags }}
+                    <span class="text-xs bg-gray-700 text-amber-400 px-2 py-0.5 rounded-full">{{ . }}</span>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+
+        </div>
+
+        <!-- Center column: description + DLC + user data -->
+        <div class="flex-1 flex flex-col gap-4 overflow-y-auto min-w-0">
+
+            <!-- Description -->
+            {{ if .Game.Description }}
+            <div class="sync-card">
+                <div class="sync-card-title">About</div>
+                <p class="text-sm text-gray-300 leading-relaxed">{{ .Game.Description }}</p>
+            </div>
+            {{ end }}
+
+            <!-- User data form -->
+            <div class="sync-card">
+                <div class="sync-card-title">My Data</div>
+                <form hx-post="/library/{{ .Game.ID }}/user" hx-target="#user-data-saved" hx-swap="innerHTML" class="flex flex-col gap-3">
+
+                    <div class="flex items-center gap-4">
+                        <!-- Play status -->
+                        <div class="flex-1">
+                            <label class="filter-heading">Status</label>
+                            <select name="play_status" class="filter-select w-full">
+                                <option value="">— unset —</option>
+                                <option value="unplayed"  {{ if eq .Game.PlayStatus "unplayed"  }}selected{{ end }}>Unplayed</option>
+                                <option value="playing"   {{ if eq .Game.PlayStatus "playing"   }}selected{{ end }}>Playing</option>
+                                <option value="completed" {{ if eq .Game.PlayStatus "completed" }}selected{{ end }}>Completed</option>
+                                <option value="dropped"   {{ if eq .Game.PlayStatus "dropped"   }}selected{{ end }}>Dropped</option>
+                                <option value="on_hold"   {{ if eq .Game.PlayStatus "on_hold"   }}selected{{ end }}>On Hold</option>
+                            </select>
+                        </div>
+
+                        <!-- Rating -->
+                        <div>
+                            <label class="filter-heading">Rating</label>
+                            <select name="rating" class="filter-select">
+                                <option value="">—</option>
+                                {{ range $i := iterate 1 5 }}
+                                <option value="{{ $i }}" {{ if eq $.Game.Rating $i }}selected{{ end }}>{{ $i }} / 5</option>
+                                {{ end }}
+                            </select>
+                        </div>
+
+                        <!-- Favourite -->
+                        <div class="flex items-center gap-2 mt-4">
+                            <input type="checkbox" name="is_favorite" value="1" id="fav-{{ .Game.ID }}"
+                                {{ if .Game.IsFavorite }}checked{{ end }}
+                                class="accent-amber-400" />
+                            <label for="fav-{{ .Game.ID }}" class="text-sm text-gray-300 cursor-pointer">Favourite</label>
+                        </div>
+                    </div>
+
+                    <!-- Short review -->
+                    <div>
+                        <label class="filter-heading">Short Review</label>
+                        <input type="text" name="short_review" value="{{ .Game.ShortReview }}"
+                            placeholder="One-liner…"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="filter-heading">Notes</label>
+                        <textarea name="notes" rows="3"
+                            placeholder="Private notes…"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500 resize-none">{{ .Game.Notes }}</textarea>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button type="submit"
+                            class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                            Save
+                        </button>
+                        <span id="user-data-saved" class="text-sm"></span>
+                    </div>
+                </form>
+            </div>
+
+            <!-- DLC / Contents -->
+            {{ if .Contents }}
+            <div class="sync-card">
+                <div class="sync-card-title">
+                    Contents
+                    {{ if .Game.IsCompleteEdition }}<span class="text-xs text-amber-400 font-normal">(Complete Edition)</span>{{ end }}
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    {{ range .Contents }}
+                    <div class="flex items-center gap-2 text-sm py-1 border-b border-gray-800 last:border-0">
+                        <span class="text-xs text-gray-500 w-12 shrink-0 uppercase">{{ .ContentType }}</span>
+                        <span class="flex-1 truncate">{{ .Title }}</span>
+                        {{ if .IsInstalled }}
+                        <span class="text-xs text-green-400">installed</span>
+                        {{ end }}
+                        {{ if eq .InstallationType "separate" }}
+                        <span class="text-xs text-gray-600">standalone</span>
+                        {{ end }}
+                    </div>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+
+            <!-- Standalone DLC children -->
+            {{ if .DLCs }}
+            <div class="sync-card">
+                <div class="sync-card-title">DLC</div>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2">
+                    {{ range .DLCs }}
+                    <a href="/library/{{ .ID }}" class="group flex flex-col gap-1">
+                        {{ if .Artwork.Square.URL }}
+                        <img src="{{ .Artwork.Square.URL | proxyURL }}" alt="{{ .Title }}"
+                             class="rounded aspect-square object-cover group-hover:ring-2 group-hover:ring-amber-400" />
+                        {{ else }}
+                        <div class="rounded aspect-square bg-gray-700 flex items-center justify-center text-gray-500 text-xs text-center p-1">
+                            {{ .Title }}
+                        </div>
+                        {{ end }}
+                        <span class="text-xs text-gray-400 truncate group-hover:text-gray-200">{{ .Title }}</span>
+                    </a>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+
+        </div>
+    </div>
+</div>
+{{ end }}

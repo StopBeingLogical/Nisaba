@@ -1,0 +1,31 @@
+{{ define "wishlist_add_partial.html" }}
+{{ if . }}
+<div class="flex flex-col gap-1">
+    {{ range . }}
+    <div class="flex items-center gap-3 p-2 bg-gray-800 rounded-lg">
+        {{ if .CoverURL }}
+        <img src="{{ .CoverURL }}" alt="{{ .Name }}" class="w-10 h-10 rounded object-cover shrink-0" />
+        {{ else }}
+        <div class="w-10 h-10 rounded bg-gray-700 shrink-0"></div>
+        {{ end }}
+        <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate">{{ .Name }}</div>
+            {{ if .ReleaseYear }}<div class="text-xs text-gray-500">{{ .ReleaseYear }}</div>{{ end }}
+        </div>
+        <form hx-post="/wishlist/add" hx-target="#wishlist-grid" hx-swap="innerHTML"
+              hx-on::after-request="document.getElementById('wishlist-add-panel').classList.add('hidden')">
+            <input type="hidden" name="igdb_id" value="{{ .IGDBID }}" />
+            <input type="hidden" name="title" value="{{ .Name }}" />
+            <input type="hidden" name="cover_url" value="{{ .CoverURL }}" />
+            <button type="submit"
+                class="px-3 py-1 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition shrink-0">
+                Add
+            </button>
+        </form>
+    </div>
+    {{ end }}
+</div>
+{{ else }}
+<div class="text-xs text-gray-500 italic py-2">No results. Try a different title.</div>
+{{ end }}
+{{ end }}

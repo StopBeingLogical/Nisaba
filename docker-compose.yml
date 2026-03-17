@@ -1,0 +1,13 @@
+services:
+
+  nisaba:
+    build: .
+    container_name: nisaba
+    restart: unless-stopped
+    environment:
+      NISABA_PORT: "8080"
+      NISABA_DB_PATH: "/data/nisaba.db"
+    volumes:
+      - /mnt/MemoryAlpha/nisaba/data:/data
+    ports:
+      - "8090:8080"
