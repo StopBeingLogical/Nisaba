@@ -4,6 +4,8 @@ Personal game library and wishlist manager. Self-hosted web app for tracking own
 
 Named after the Sumerian goddess of writing and record-keeping.
 
+**Designed by [StopBeingLogical](https://github.com/StopBeingLogical) · Built by [Claude](https://claude.ai)**
+
 ---
 
 ## Features
