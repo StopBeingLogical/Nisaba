@@ -1,4 +1,21 @@
-# NISABA Changelog
+# NISABA — Changelog
+
+**Top-level only:** Major features, significant integrations, deployment changes.
+
+For detailed changes, see subdirectory changelogs:
+- `db/CHANGELOG.md` — Schema & migrations
+- `handlers/CHANGELOG.md` — HTTP handlers & features
+- `sync/CHANGELOG.md` — Sync pipelines & integrations
+- `schema/CHANGELOG.md` — Design documentation
+
+---
+
+## [Unreleased]
+
+### Status
+- No pending changes
+
+---
 
 ## 2026-03-12
 
