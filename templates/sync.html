@@ -200,15 +200,38 @@
             </div>
 
             <textarea id="playnite-script" readonly class="w-full h-32 bg-gray-900 border border-gray-800 rounded p-2 text-[10px] font-mono text-gray-400 mb-2">
+# Nisaba Playnite Sync Script
 $NisabaUrl = "http://192.168.3.174:8090/api/sync/playnite"
-$ApiSecret = "" # Set this if you configured sync.api_secret in Nisaba
+$ApiSecret = "" # Set this if you configured sync.api_secret in Nisaba settings
+
+if ($null -eq $PlayniteApi) {
+    Write-Warning "Playnite API variable not found in current scope. If you are running this as a file, use: . .\sync_playnite.ps1"
+}
 
 $games = $PlayniteApi.Database.Games
+if ($null -eq $games) {
+    Write-Error "Could not retrieve games database. Ensure Playnite is fully initialized."
+    return
+}
 $payload = @{ games = @() }
+
+Write-Host "Gathering metadata for $($games.Count) games..."
 
 foreach ($g in $games) {
     $source = if ($g.Source) { $g.Source.Name.ToLower() } else { "playnite" }
     $lastPlayed = if ($g.LastActivity) { $g.LastActivity.ToString("yyyy-MM-ddTHH:mm:ssZ") } else { "" }
+    
+    $releaseDate = ""
+    if ($g.ReleaseDate) {
+        $rd = $g.ReleaseDate
+        if ($rd.Day -and $rd.Month) {
+            $releaseDate = "{0:D4}-{1:D2}-{2:D2}" -f $rd.Year, $rd.Month, $rd.Day
+        } elseif ($rd.Month) {
+            $releaseDate = "{0:D4}-{1:D2}-01" -f $rd.Year, $rd.Month
+        } else {
+            $releaseDate = "{0:D4}-01-01" -f $rd.Year
+        }
+    }
     
     $platforms = if ($g.Platforms) { $g.Platforms | ForEach-Object { $_.Name.ToLower() } } else { @() }
     $isWin = $platforms -contains "pc (windows)" -or $platforms -contains "windows"
@@ -228,7 +251,7 @@ foreach ($g in $games) {
         linux = $isLin
         developer = if ($g.Developers) { ($g.Developers | Select-Object -First 1).Name } else { "" }
         publisher = if ($g.Publishers) { ($g.Publishers | Select-Object -First 1).Name } else { "" }
-        release_date = if ($g.ReleaseDate) { $g.ReleaseDate.ToString("yyyy-MM-dd") } else { "" }
+        release_date = $releaseDate
         description = $g.Description
     }
     $payload.games += $item
@@ -238,12 +261,17 @@ $json = $payload | ConvertTo-Json -Depth 10
 $headers = @{ "Content-Type" = "application/json" }
 if ($ApiSecret) { $headers.Add("X-Nisaba-Secret", $ApiSecret) }
 
-Write-Host "Syncing $($payload.games.Count) games to Nisaba..."
+Write-Host "Sending data to Nisaba at $NisabaUrl..."
 try {
     $response = Invoke-RestMethod -Uri $NisabaUrl -Method Post -Body $json -Headers $headers
-    Write-Host "Success! Added: $($response.added), Updated: $($response.updated), Errors: $($response.errors)"
+    Write-Host "Sync Complete! Added: $($response.added), Updated: $($response.updated), Errors: $($response.errors)" -ForegroundColor Green
 } catch {
     Write-Error "Sync failed: $_"
+    if ($_.Exception.Response) {
+        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+        $details = $reader.ReadToEnd()
+        Write-Host "Server Response: $details" -ForegroundColor Red
+    }
 }
             </textarea>
 
