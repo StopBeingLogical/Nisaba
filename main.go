@@ -109,6 +109,7 @@ func main() {
 	r.Post("/api/mystery-packs/scrape/queue", h.ScrapeQueue)
 	r.Get("/api/mystery-packs/scrape/review", h.ScrapeReview)
 	r.Post("/api/mystery-packs/scrape/apply", h.ScrapeApply)
+	r.Post("/api/sync/playnite", h.SyncPlaynite)
 
 	// Game lookup route (needs to accept OPTIONS for CORS preflight)
 	r.Route("/api/mystery-packs/lookup-game", func(r chi.Router) {
@@ -146,7 +147,6 @@ func main() {
 		r.Post("/sync/wishlist/gog", h.SyncGOGWishlist)
 		r.Post("/sync/import/heroic", h.ImportHeroic)
 		r.Post("/sync/import/heroic/upload", h.UploadHeroicFiles)
-		r.Post("/api/sync/playnite", h.SyncPlaynite)
 		r.Post("/sync/deck", h.SyncDeckStatus)
 		r.Post("/sync/proton", h.SyncProtonRatings)
 		r.Post("/sync/steam-crossref", h.SyncSteamCrossRefs)
