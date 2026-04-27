@@ -216,6 +216,7 @@ for ($i = 0; $i -lt $allGames.Count; $i += $BatchSize) {
     $payload = @{ games = @() }
     foreach ($g in $batch) {
         if ($null -eq $g) { continue }
+        if ($g.Categories -and ($g.Categories | Where-Object { $_.Name -eq "Steam Family Sharing" })) { continue }
         $source = if ($g.Source) { $g.Source.Name.ToLower() } else { "playnite" }
         $lastPlayed = if ($g.LastActivity) { $g.LastActivity.ToString("yyyy-MM-ddTHH:mm:ssZ") } else { "" }
         $releaseDate = ""
