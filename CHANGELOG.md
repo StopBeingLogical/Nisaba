@@ -12,8 +12,13 @@ For detailed changes, see subdirectory changelogs:
 
 ## [Unreleased]
 
-### Status
-- No pending changes
+### Added
+- **Mystery Pack Scraper Integration** — 3-stage stateful API (Queue, Review, Apply) for importing game packs from keyshops.
+- **Chrome Extension** — Manifest V3 scraper for G2A (and others) with batch collection and interactive diff review dashboard.
+- **Dynamic Price Tracking** — Automated tracking of multi-seller offers and historical price snapshots for mystery packs.
+
+### Changed
+- Refactored `sync_log` type checking to support mystery pack sync events.
 
 ---
 

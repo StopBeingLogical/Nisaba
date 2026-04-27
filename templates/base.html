@@ -17,6 +17,7 @@
         <a href="/"         class="nav-link {{ if eq .Page "dashboard" }}active{{ end }}">Dashboard</a>
         <a href="/library"  class="nav-link {{ if eq .Page "library"  }}active{{ end }}">Library</a>
         <a href="/wishlist" class="nav-link {{ if eq .Page "wishlist" }}active{{ end }}">Wishlist</a>
+        <a href="/mystery-packs" class="nav-link {{ if eq .Page "mystery-packs" }}active{{ end }}">Mystery Packs</a>
         <a href="/review"   class="nav-link {{ if eq .Page "review"   }}active{{ end }}">
             Review Queue
             {{ if gt .NeedsReview 0 }}

@@ -1,0 +1,167 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Mystery Packs — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+
+    <!-- ── Top bar ───────────────────────────────────────────── -->
+    <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-10">
+        <h1 class="text-lg font-semibold flex-1">Mystery Key Packs</h1>
+
+        <button onclick="document.getElementById('add-site-panel').classList.toggle('hidden')"
+            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition shrink-0">
+            + Add Site
+        </button>
+
+        <button onclick="document.getElementById('add-pack-panel').classList.toggle('hidden')"
+            class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-sm rounded-lg transition shrink-0">
+            + Add Pack
+        </button>
+
+        <button hx-post="/sync/mystery-packs"
+            hx-target="#sync-status"
+            hx-swap="outerHTML"
+            class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-sm rounded-lg transition shrink-0">
+            Analyze All
+        </button>
+    </div>
+
+    <!-- ── Add site panel ─────────────────────────────────────── -->
+    <div id="add-site-panel" class="hidden border-b border-gray-800 bg-gray-900 px-6 py-4">
+        <div class="max-w-2xl">
+            <div class="font-semibold mb-3">Add Site</div>
+            <form hx-post="/mystery-packs/sites/add" hx-boost="true" class="flex flex-col gap-3 mb-4">
+                <input type="text" name="id" placeholder="Site ID (e.g., g2a)" required
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <input type="text" name="name" placeholder="Site Name (e.g., G2A)" required
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <input type="url" name="base_url" placeholder="Base URL (e.g., https://www.g2a.com)" required
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                    Add Site
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── Add pack panel (hidden by default) ─────────────────── -->
+    <div id="add-pack-panel" class="hidden border-b border-gray-800 bg-gray-900 px-6 py-4">
+        <div class="max-w-2xl">
+            <div class="font-semibold mb-3">Add Mystery Pack</div>
+            <form hx-post="/mystery-packs/add" hx-boost="true" class="flex flex-col gap-3 mb-4">
+                <input type="text" name="id" placeholder="Pack ID (e.g., g2a-aaa)" required
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <select name="site_id" required
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500">
+                    <option value="">Select Site</option>
+                    {{ range .Sites }}
+                    <option value="{{ .ID }}">{{ .Name }}</option>
+                    {{ end }}
+                </select>
+                <input type="text" name="name" placeholder="Pack Name (e.g., AAA Premium)" required
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <input type="url" name="url" placeholder="Pack URL" required
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <select name="pack_type" required
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500">
+                    <option value="">Select Pack Type</option>
+                    <option value="set_list">Set List (Disclosed Games)</option>
+                    <option value="min_value">Minimum Value (Price Floor)</option>
+                </select>
+                <input type="number" name="key_count" placeholder="Key Count (default 10)" value="10" min="1"
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                    Add Pack
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── Packs grid ────────────────────────────────────────── -->
+    <div class="flex-1 overflow-y-auto p-6">
+        {{ if .Packs }}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {{ range .Packs }}
+            <div class="sync-card flex flex-col">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="sync-card-title">{{ .Name }}</div>
+                    <span class="store-badge text-xs">{{ .SiteName }}</span>
+                </div>
+
+                {{ if eq .PackType "set_list" }}
+                <span class="text-xs bg-green-900 text-green-300 px-2 py-0.5 rounded mb-2 w-fit">Set List</span>
+                {{ else if eq .PackType "min_value" }}
+                <span class="text-xs bg-amber-900 text-amber-300 px-2 py-0.5 rounded mb-2 w-fit">Min Value</span>
+                {{ end }}
+
+                {{ if .PriceUSD }}
+                <div class="text-sm text-gray-400 mb-2">${{ printf "%.2f" (ptrFloat .PriceUSD) }}</div>
+                {{ else }}
+                <div class="text-sm text-gray-600 mb-2 italic">No price set</div>
+                {{ end }}
+
+                {{ if .RecommendationBadge }}
+                <div class="mb-2">
+                    {{ if eq (ptrStr .RecommendationBadge) "STRONG BUY" }}
+                    <span class="badge badge-strongbuy">{{ ptrStr .RecommendationBadge }}</span>
+                    {{ else if eq (ptrStr .RecommendationBadge) "BUY" }}
+                    <span class="badge badge-buy">{{ ptrStr .RecommendationBadge }}</span>
+                    {{ else if eq (ptrStr .RecommendationBadge) "CONSIDER" }}
+                    <span class="badge badge-consider">{{ ptrStr .RecommendationBadge }}</span>
+                    {{ else if eq (ptrStr .RecommendationBadge) "SKIP" }}
+                    <span class="badge badge-skip">{{ ptrStr .RecommendationBadge }}</span>
+                    {{ else }}
+                    <span class="badge badge-avoid">{{ ptrStr .RecommendationBadge }}</span>
+                    {{ end }}
+                    {{ if .ROIKeyshop }}
+                    <span class="text-xs text-gray-400 ml-1">({{ printf "%.1f" (ptrFloat .ROIKeyshop) }}x)</span>
+                    {{ end }}
+                </div>
+                {{ end }}
+
+                {{ if .OverlapCount }}
+                <div class="text-xs text-gray-500 mb-3">{{ .OverlapCount }} owned • {{ .LastAnalyzed }}</div>
+                {{ else if .LastAnalyzed }}
+                <div class="text-xs text-gray-500 mb-3">Analyzed: {{ .LastAnalyzed }}</div>
+                {{ end }}
+
+                <div class="mt-auto flex gap-2">
+                    <a href="/mystery-packs/{{ .ID }}" class="flex-1 text-center px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs transition">
+                        View
+                    </a>
+                    <button hx-post="/mystery-packs/{{ .ID }}/analyze" hx-target="closest .sync-card" hx-swap="outerHTML" class="flex-1 px-2 py-1 bg-amber-600 hover:bg-amber-500 text-gray-950 rounded text-xs font-semibold transition">
+                        Analyze
+                    </button>
+                </div>
+            </div>
+            {{ end }}
+        </div>
+        {{ else }}
+        <div class="text-center text-gray-500 py-12">
+            <p class="text-sm">No mystery packs yet. Add one to get started.</p>
+        </div>
+        {{ end }}
+    </div>
+
+    <!-- ── Sync status ───────────────────────────────────────── -->
+    <div id="sync-status">
+        {{ template "sync_status_partial.html" .SyncStatus }}
+    </div>
+</div>
+
+<style>
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.badge-strongbuy { background-color: rgb(20, 83, 45); color: rgb(134, 239, 172); }
+.badge-buy { background-color: rgb(15, 118, 110); color: rgb(134, 239, 191); }
+.badge-consider { background-color: rgb(78, 65, 12); color: rgb(253, 224, 71); }
+.badge-skip { background-color: rgb(55, 65, 81); color: rgb(209, 213, 219); }
+.badge-avoid { background-color: rgb(127, 29, 29); color: rgb(254, 202, 202); }
+</style>
+{{ end }}

@@ -9,19 +9,35 @@
 ---
 
 ## Top-Level Changes (Major only)
-- 
+- Added Playnite-to-Nisaba automated library sync via PowerShell (2026-04-26)
+- Added Chrome extension scrape API for mystery pack integration (2026-04-24)
 
 ## db/ Changes
-- 
+- Added mystery_pack_scrape_queues table for queueing scraped data
+- Added mystery_pack_offers table for multi-seller price tracking
+- Added mystery_pack_price_history table for price snapshots
+- Added 12 new store methods for queue, offer, and price history management
+- Added ListWishlistTitleIndex() for game title matching
 
 ## handlers/ Changes
-- 
+- Added POST /api/sync/playnite for automated library updates (2026-04-26)
+- Added Playnite sync card to Sync UI with copyable PowerShell script
+- Replaced Heroic import UI with automated Playnite sync
+- Added POST /api/mystery-packs/scrape/queue for data ingestion with validation
+- Added GET /api/mystery-packs/scrape/review for diff computation
+- Added POST /api/mystery-packs/scrape/apply for user-approved changes
 
 ## sync/ Changes
-- 
+- Added standalone sync_playnite.ps1 PowerShell script for Playnite SDK (2026-04-26)
+- Added game title suffix stripping (Steam Key, Global, PC, ROW, Windows, etc.)
+- Added DescriptionSimilarity() for change detection using Jaccard similarity
+- Added MatchGameTitle() for local library/wishlist matching before IGDB
+- Added NormalizePack() for URL-safe pack ID slug generation
 
 ## schema/ Changes
-- 
+- Added mystery_pack_scrape_queues with ISO timestamps and applied_at tracking
+- Added mystery_pack_offers with seller-specific pricing and validity dates
+- Added mystery_pack_price_history for trend analysis and price auditing
 
 ---
 

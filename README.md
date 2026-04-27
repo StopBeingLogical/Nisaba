@@ -11,6 +11,7 @@ Named after the Sumerian goddess of writing and record-keeping.
 ## Features
 
 - **Unified library** — aggregates games from Steam, GOG, Epic, and Amazon into a single browsable grid
+- **Playnite Sync** — automated library synchronization from Playnite (Windows) via PowerShell; imports metadata, playtime, and ownership for all non-Steam sources
 - **Wishlist tracking** — imports wishlists from Steam and GOG, resolves names for unreleased/restricted titles
 - **Price monitoring** — fetches current prices, keyshop prices, and historical lows via gg.deals; falls back to reseller scrapers for non-Steam entries
 - **IGDB enrichment** — auto-matches games to IGDB records for cover art, descriptions, genres, and release dates; unmatched games go to a review queue
@@ -19,6 +20,8 @@ Named after the Sumerian goddess of writing and record-keeping.
 - **Install state tracking** — reads Steam `appmanifest_*.acf` files directly from the browser via the File System Access API; no client software required
 - **Image proxy** — all external images (Steam CDN, IGDB, simpleicons.org) are routed through the server and cached locally, so the UI renders correctly on firewalled networks
 - **Persistent logs** — all sync output is written to disk and visible in the UI across container restarts
+- **Mystery pack analysis** — tracks multi-seller game bundle prices and computes ROI, overlap, and value metrics across keyshops (G2A, K4G, Kinguin, Eneba, Fanatical)
+- **Extension integration** — Chrome extension can scrape pack pages and import them with diff review before applying changes
 
 ---
 
@@ -51,7 +54,7 @@ schema.sql                 SQLite schema
 ### Sync pipeline
 
 ```
-Steam ownership → GOG/Epic/Amazon (Heroic) → IGDB enrichment → RAWG fallback → review queue
+Steam ownership → Playnite automated sync (replaces Heroic/GOG native) → IGDB enrichment → RAWG fallback → review queue
 ```
 
 ### Pricing pipeline
@@ -99,6 +102,21 @@ docker exec nisaba /app/nisaba -set-password 'yourpassword'
 
 ---
 
+## Extension Integration
+
+Chrome extension support for importing mystery game packs with semi-automated diffing:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/mystery-packs/scrape/queue` | POST | Queue scraped page data for review |
+| `/api/mystery-packs/scrape/review?queue={id}` | GET | Retrieve diff (changes) vs. stored packs |
+| `/api/mystery-packs/scrape/apply` | POST | Apply user-approved changes |
+| `/api/sync/playnite` | POST | Automated library sync from Playnite (PowerShell) |
+
+All mystery-pack endpoints require session authentication. The Playnite sync endpoint supports either a session cookie or a pre-shared `X-Nisaba-Secret` header.
+
+---
+
 ## Configuration
 
 Settings are stored in the `app_config` table and managed through the `/settings` UI:
@@ -111,6 +129,7 @@ Settings are stored in the `app_config` table and managed through the `/settings
 | `steam.api_key` | Steam Web API key |
 | `steam.steam_id` | Your Steam ID64 |
 | `gog.refresh_token` | GOG OAuth refresh token |
+| `sync.api_secret` | Pre-shared secret for automated Playnite sync |
 
 ---
 

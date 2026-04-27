@@ -1,0 +1,48 @@
+{{ define "mystery_pack_games_section_partial.html" }}
+<div id="games-list">
+    {{ if .Games }}
+    <div class="overflow-x-auto mb-4">
+        <table class="w-full text-sm">
+            <thead class="border-b border-gray-700">
+                <tr class="text-gray-400">
+                    <th class="text-left px-3 py-2">Title</th>
+                    <th class="text-right px-3 py-2">Retail</th>
+                    <th class="text-right px-3 py-2">Keyshop</th>
+                    <th class="text-center px-3 py-2">Status</th>
+                    <th class="text-center px-3 py-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Games }}
+                <tr class="border-b border-gray-800 hover:bg-gray-800/50">
+                    <td class="px-3 py-2">{{ .Title }}</td>
+                    <td class="text-right px-3 py-2 text-gray-400">
+                        {{ if .RetailPriceUSD }}${{ printf "%.2f" .RetailPriceUSD }}{{ else }}—{{ end }}
+                    </td>
+                    <td class="text-right px-3 py-2 text-amber-400">
+                        {{ if .KeyshopPriceUSD }}${{ printf "%.2f" .KeyshopPriceUSD }}{{ else }}—{{ end }}
+                    </td>
+                    <td class="text-center px-3 py-2">
+                        {{ if .SteamAppID }}<span class="text-xs text-gray-500">{{ .SteamAppID }}</span>{{ else }}<span class="text-xs text-gray-600">No App ID</span>{{ end }}
+                    </td>
+                    <td class="text-center px-3 py-2">
+                        <button hx-post="/mystery-packs/{{ $.PackID }}/games/{{ .Title }}/remove" hx-target="#games-list" hx-swap="outerHTML"
+                            class="text-xs text-red-400 hover:text-red-300 transition" onclick="return confirm('Remove this game?')">
+                            Remove
+                        </button>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ else }}
+    <div class="text-gray-500 text-sm mb-4">No games added yet.</div>
+    {{ end }}
+
+    <!-- Add Game Form -->
+    <div class="border-t border-gray-700 pt-4 mt-4">
+        {{ template "mystery_pack_game_add_partial.html" (dict "PackID" .PackID "Games" .Games) }}
+    </div>
+</div>
+{{ end }}

@@ -1,0 +1,139 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}{{ .Pack.Name }} — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto">
+
+    <!-- ── Top bar ───────────────────────────────────────────── -->
+    <div class="px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-10">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-lg font-semibold">{{ .Pack.Name }}</h1>
+                <p class="text-sm text-gray-500">{{ .Pack.SiteName }}</p>
+            </div>
+            <button onclick="if(confirm('Delete this pack?')) { htmx.ajax('POST', '/mystery-packs/{{ .Pack.ID }}/delete', {target: 'body', select: 'main', swap: 'outerHTML'}); }"
+                class="px-3 py-1.5 bg-red-700 hover:bg-red-600 text-sm rounded-lg transition">
+                Delete
+            </button>
+        </div>
+    </div>
+
+    <div class="p-6 space-y-6 max-w-4xl">
+
+        <!-- ── Pack Info ──────────────────────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title mb-4">Pack Details</div>
+            <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+                <div>
+                    <span class="text-gray-500">Type</span>
+                    <div>{{ if eq .Pack.PackType "set_list" }}Set List{{ else }}Minimum Value{{ end }}</div>
+                </div>
+                <div>
+                    <span class="text-gray-500">Keys</span>
+                    <div>{{ .Pack.KeyCount }}</div>
+                </div>
+                <div>
+                    <span class="text-gray-500">Price</span>
+                    <form hx-post="/mystery-packs/{{ .Pack.ID }}/price" hx-target="this" hx-swap="outerHTML" class="flex gap-2">
+                        <input type="number" name="price_usd" step="0.01" {{ if .Pack.PriceUSD }}value="{{ .Pack.PriceUSD }}"{{ end }} placeholder="$0.00" required
+                            class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm outline-none focus:border-amber-500 w-24" />
+                        <button type="submit" class="px-2 py-1 bg-amber-600 hover:bg-amber-500 rounded text-xs transition">Update</button>
+                    </form>
+                </div>
+                <div>
+                    <span class="text-gray-500">URL</span>
+                    <a href="{{ .Pack.URL }}" target="_blank" class="text-amber-400 hover:underline text-sm break-all">Open</a>
+                </div>
+            </div>
+            {{ if .Pack.Notes }}
+            <div class="text-sm text-gray-400 p-3 bg-gray-800 rounded">{{ .Pack.Notes }}</div>
+            {{ end }}
+        </div>
+
+        <!-- ── Analysis Results ──────────────────────────────── -->
+        {{ if .Pack.Analysis }}
+        <div id="analysis-card" class="sync-card">
+            <div class="sync-card-title mb-4">Analysis Results</div>
+            <p class="text-sm text-gray-400">Analysis saved</p>
+        </div>
+        {{ else }}
+        <div class="sync-card text-center py-6">
+            <p class="text-gray-500 text-sm mb-4">No analysis yet. Click "Analyze" to generate one.</p>
+            <button hx-post="/mystery-packs/{{ .Pack.ID }}/analyze" hx-target="#analysis-card" hx-swap="outerHTML"
+                class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                Analyze Pack
+            </button>
+        </div>
+        {{ end }}
+
+        <!-- ── Games List ─────────────────────────────────────── -->
+        {{ if eq .Pack.PackType "set_list" }}
+        <div class="sync-card">
+            <div class="sync-card-title mb-4">Games</div>
+
+            <div id="games-list">
+                {{ if .Pack.Games }}
+                <div class="overflow-x-auto mb-4">
+                    <table class="w-full text-sm">
+                        <thead class="border-b border-gray-700">
+                            <tr class="text-gray-400">
+                                <th class="text-left px-3 py-2">Title</th>
+                                <th class="text-right px-3 py-2">Retail</th>
+                                <th class="text-right px-3 py-2">Keyshop</th>
+                                <th class="text-center px-3 py-2">Status</th>
+                                <th class="text-center px-3 py-2">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ range .Pack.Games }}
+                            <tr class="border-b border-gray-800 hover:bg-gray-800/50">
+                                <td class="px-3 py-2">{{ .Title }}</td>
+                                <td class="text-right px-3 py-2 text-gray-400">
+                                    {{ if .RetailPriceUSD }}${{ printf "%.2f" .RetailPriceUSD }}{{ else }}—{{ end }}
+                                </td>
+                                <td class="text-right px-3 py-2 text-amber-400">
+                                    {{ if .KeyshopPriceUSD }}${{ printf "%.2f" .KeyshopPriceUSD }}{{ else }}—{{ end }}
+                                </td>
+                                <td class="text-center px-3 py-2">
+                                    {{ if .SteamAppID }}<span class="text-xs text-gray-500">{{ .SteamAppID }}</span>{{ else }}<span class="text-xs text-gray-600">No App ID</span>{{ end }}
+                                </td>
+                                <td class="text-center px-3 py-2">
+                                    <button hx-post="/mystery-packs/{{ $.Pack.ID }}/games/{{ .Title }}/remove" hx-target="#games-list" hx-swap="outerHTML"
+                                        class="text-xs text-red-400 hover:text-red-300 transition" onclick="return confirm('Remove this game?')">
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
+                </div>
+                {{ else }}
+                <div class="text-gray-500 text-sm mb-4">No games added yet.</div>
+                {{ end }}
+
+                <!-- Add Game Form -->
+                <div class="border-t border-gray-700 pt-4 mt-4">
+                    {{ template "mystery_pack_game_add_partial.html" (dict "PackID" .Pack.ID "Games" .Pack.Games) }}
+                </div>
+            </div>
+        </div>
+        {{ end }}
+
+        <!-- ── Analyze Button ─────────────────────────────────– -->
+        <div class="flex gap-3">
+            <button hx-post="/mystery-packs/{{ .Pack.ID }}/analyze" hx-target="#analysis-card" hx-swap="outerHTML"
+                class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                Analyze Pack
+            </button>
+            <a href="/mystery-packs" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition">
+                Back to List
+            </a>
+        </div>
+    </div>
+
+    <!-- ── Sync status ───────────────────────────────────────– -->
+    <div id="sync-status"></div>
+</div>
+{{ end }}

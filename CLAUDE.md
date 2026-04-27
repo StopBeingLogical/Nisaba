@@ -106,7 +106,7 @@ Always include `--exclude='._*'` in rsync commands. macOS creates `._filename` r
 - Username is hardcoded: `bobby`
 - Password stored as bcrypt hash in `app_config` table under key `auth.password_hash`
 - Set/change password: `sudo docker exec nisaba /app/nisaba -set-password 'password'`
-- Public routes: `/`, `/library`, `/library/{id}`, `/wishlist`, `/wishlist/{id}`, `/static/*`, `/img/proxy`, `/sync/status`, `/auth/login`
+- Public routes: `/`, `/library`, `/library/{id}`, `/wishlist`, `/wishlist/{id}`, `/static/*`, `/img/proxy`, `/sync/status`, `/auth/login`, `/api/sync/playnite` (secret required)
 - Everything else requires auth
 
 ## Database Migrations Added (beyond schema.sql)

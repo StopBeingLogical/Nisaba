@@ -565,3 +565,30 @@ func EnrichWishlist(store *db.Store, client *IGDBClient, progressFn func(EnrichP
 
 	return nil
 }
+
+// SearchIGDBSteamAppID searches IGDB for a game by title and returns its Steam App ID.
+// Returns ("", nil) if not found or if the game has no Steam website.
+func (c *IGDBClient) SearchIGDBSteamAppID(title string) (string, error) {
+	results, err := c.SearchGamePC(title)
+	if err != nil || len(results) == 0 {
+		return "", err
+	}
+
+	match := bestMatch(title, results)
+	if match == nil {
+		return "", nil
+	}
+
+	// Fetch websites for the matched game to extract Steam App ID
+	steamMap, err := c.FetchSteamAppIDs([]int64{match.ID})
+	if err != nil {
+		return "", err
+	}
+
+	appID, ok := steamMap[match.ID]
+	if !ok {
+		return "", nil
+	}
+
+	return appID, nil
+}
