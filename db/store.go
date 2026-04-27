@@ -1749,6 +1749,15 @@ func (s *Store) FindGameByStoreID(store, storeID string) (string, error) {
 	return gameID, err
 }
 
+func (s *Store) FindGameByTitle(title string) (string, error) {
+	var id string
+	err := s.db.QueryRow(`SELECT id FROM games WHERE title = ? OR sort_title = ? LIMIT 1`, title, makeSortTitle(title)).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return id, err
+}
+
 // InsertGameParams holds fields for a new game record.
 type InsertGameParams struct {
 	ID               string

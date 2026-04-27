@@ -750,8 +750,17 @@ func (h *Handler) SyncPlaynite(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if gameID == "" {
-			log.Printf("SyncPlaynite: adding new game: %s", g.Title)
-			// New game from Playnite.
+			// Fallback: Try to find by title to prevent duplicates if store link is new.
+			gameID, err = h.store.FindGameByTitle(g.Title)
+			if err != nil {
+				log.Printf("SyncPlaynite: db error searching by title for %s: %v", g.Title, err)
+			}
+			if gameID != "" {
+				log.Printf("SyncPlaynite: matched %s by title (no store link found)", g.Title)
+			}
+		}
+
+		if gameID == "" {
 			gameID = uuid.New().String()
 			err = h.store.InsertGame(db.InsertGameParams{
 				ID:               gameID,
