@@ -2499,12 +2499,19 @@ ORDER BY recorded_at DESC`,
 func (s *Store) SyncPackLowestPrice(packID string) error {
 	_, err := s.db.Exec(`
 UPDATE mystery_packs
-SET price_usd = (
-	SELECT MIN(price_usd)
-	FROM mystery_pack_offers
-	WHERE pack_id = ?
-)
-WHERE id = ?`,
-		packID, packID)
+SET price_usd = (SELECT MIN(price_usd) FROM mystery_pack_offers WHERE pack_id = ?)
+WHERE id = ?`, packID, packID)
 	return err
 }
+
+// makeSortTitle strips leading articles for alphabetical sorting.
+func makeSortTitle(title string) string {
+	lower := strings.ToLower(title)
+	for _, prefix := range []string{"the ", "a ", "an "} {
+		if strings.HasPrefix(lower, prefix) {
+			return strings.TrimSpace(title[len(prefix):])
+		}
+	}
+	return title
+}
+
