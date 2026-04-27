@@ -104,7 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_game_tags_tag ON game_tags(tag);
 -- Store links
 CREATE TABLE IF NOT EXISTS game_stores (
     game_id     TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-    store       TEXT NOT NULL CHECK (store IN ('epic', 'gog', 'amazon', 'steam', 'ea', 'ubisoft')),
+    store       TEXT NOT NULL,
     store_id    TEXT,
     store_url   TEXT,
     owned       INTEGER NOT NULL DEFAULT 1,  -- 0 = reference only (Steam cross-ref)
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS game_install_sources (
     volume_id          TEXT REFERENCES storage_volumes(id),
     install_path       TEXT,
     install_size_bytes INTEGER,
-    runner             TEXT CHECK (runner IN ('steam', 'legendary', 'gog', 'nile', 'ea', 'ubisoft', 'native')),
+    runner             TEXT,
     last_seen          TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (game_id, device_id)
 );
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS wishlist_tags (
 -- Store availability per wishlist entry
 CREATE TABLE IF NOT EXISTS wishlist_stores (
     wishlist_id TEXT NOT NULL REFERENCES wishlist_entries(id) ON DELETE CASCADE,
-    store       TEXT NOT NULL CHECK (store IN ('steam', 'gog', 'epic', 'amazon', 'humble', 'fanatical')),
+    store       TEXT NOT NULL,
     store_id    TEXT,
     store_url   TEXT,
     PRIMARY KEY (wishlist_id, store)

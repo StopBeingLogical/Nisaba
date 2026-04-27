@@ -301,5 +301,79 @@ func runMigrations(sqlDB *sql.DB) error {
 			}
 		}
 	}
+	return migrateStoreConstraints(sqlDB)
+}
+
+// migrateStoreConstraints drops the hardcoded CHECK constraints on store columns
+// to allow arbitrary storefronts from Playnite.
+func migrateStoreConstraints(db *sql.DB) error {
+	var sqlText string
+	err := db.QueryRow("SELECT sql FROM sqlite_master WHERE type='table' AND name='game_stores'").Scan(&sqlText)
+	if err != nil {
+		return err
+	}
+	
+	// If the schema still has the CHECK constraint, rebuild the tables.
+	if strings.Contains(sqlText, "CHECK (store IN") {
+		log.Println("Migrating database to remove store CHECK constraints...")
+		_, err = db.Exec(`
+			PRAGMA foreign_keys=off;
+			BEGIN TRANSACTION;
+			
+			-- game_stores
+			ALTER TABLE game_stores RENAME TO _game_stores_old;
+			CREATE TABLE game_stores (
+				game_id     TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+				store       TEXT NOT NULL,
+				store_id    TEXT,
+				store_url   TEXT,
+				owned       INTEGER NOT NULL DEFAULT 1,
+				owned_since TEXT,
+				PRIMARY KEY (game_id, store)
+			);
+			INSERT INTO game_stores SELECT * FROM _game_stores_old;
+			DROP TABLE _game_stores_old;
+			CREATE INDEX idx_game_stores_store    ON game_stores(store);
+			CREATE INDEX idx_game_stores_owned    ON game_stores(owned);
+			CREATE INDEX idx_game_stores_store_id ON game_stores(store_id);
+
+			-- game_install_sources
+			ALTER TABLE game_install_sources RENAME TO _game_install_sources_old;
+			CREATE TABLE game_install_sources (
+				game_id            TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+				device_id          TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+				volume_id          TEXT REFERENCES storage_volumes(id),
+				install_path       TEXT,
+				install_size_bytes INTEGER,
+				runner             TEXT,
+				last_seen          TEXT NOT NULL DEFAULT (datetime('now')),
+				PRIMARY KEY (game_id, device_id)
+			);
+			INSERT INTO game_install_sources SELECT * FROM _game_install_sources_old;
+			DROP TABLE _game_install_sources_old;
+			CREATE INDEX idx_install_sources_game_id   ON game_install_sources(game_id);
+			CREATE INDEX idx_install_sources_device_id ON game_install_sources(device_id);
+
+			-- wishlist_stores
+			ALTER TABLE wishlist_stores RENAME TO _wishlist_stores_old;
+			CREATE TABLE wishlist_stores (
+				wishlist_id TEXT NOT NULL REFERENCES wishlist_entries(id) ON DELETE CASCADE,
+				store       TEXT NOT NULL,
+				store_id    TEXT,
+				store_url   TEXT,
+				PRIMARY KEY (wishlist_id, store)
+			);
+			INSERT INTO wishlist_stores SELECT * FROM _wishlist_stores_old;
+			DROP TABLE _wishlist_stores_old;
+
+			COMMIT;
+			PRAGMA foreign_keys=on;
+		`)
+		if err != nil {
+			log.Printf("Migration failed: %v", err)
+			return err
+		}
+		log.Println("Store constraint migration complete.")
+	}
 	return nil
 }
