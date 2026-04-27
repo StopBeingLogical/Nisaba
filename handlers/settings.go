@@ -20,6 +20,7 @@ type AppConfig struct {
 	RAWGAPIKeySet       bool
 	GGDealsAPIKeySet    bool
 	ITADAPIKeySet       bool
+	SyncAPIKeySet       bool
 	GOGRefreshTokenSet  bool
 	GOGTokenStatus      string // "valid", "expired", or ""
 	GOGTokenExpiry      string // human-readable expiry time
@@ -53,6 +54,7 @@ func (h *Handler) Settings(w http.ResponseWriter, r *http.Request) {
 		RAWGAPIKeySet:       cfg["rawg.api_key"] != "",
 		GGDealsAPIKeySet:    cfg["ggdeals.api_key"] != "",
 		ITADAPIKeySet:       cfg["itad.api_key"] != "",
+		SyncAPIKeySet:       cfg["sync.api_secret"] != "",
 		GOGRefreshTokenSet:  cfg["gog.refresh_token"] != "",
 		HeroicLibraryPath:   orDefault(cfg["heroic.library_path"], "./store_library_files"),
 		SessionHours:        orDefault(cfg["auth.session_hours"], "12"),
@@ -100,6 +102,7 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 		{"rawg_api_key", "rawg.api_key"},
 		{"ggdeals_api_key", "ggdeals.api_key"},
 		{"itad_api_key", "itad.api_key"},
+		{"sync_api_secret", "sync.api_secret"},
 		{"gog_refresh_token", "gog.refresh_token"},
 	} {
 		if v := r.FormValue(pair[0]); v != "" {

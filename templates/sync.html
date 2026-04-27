@@ -203,74 +203,55 @@
 # Nisaba Playnite Sync Script
 $NisabaUrl = "http://192.168.3.174:8090/api/sync/playnite"
 $ApiSecret = "" # Set this if you configured sync.api_secret in Nisaba settings
+$BatchSize = 50
 
-if ($null -eq $PlayniteApi) {
-    Write-Warning "Playnite API variable not found in current scope. If you are running this as a file, use: . .\sync_playnite.ps1"
-}
+if ($null -eq $PlayniteApi) { $PlayniteApi = [Playnite.SDK.API]::Instance }
+$allGames = $PlayniteApi.Database.Games
+if ($null -eq $allGames) { Write-Error "Could not retrieve games database."; return }
 
-$games = $PlayniteApi.Database.Games
-if ($null -eq $games) {
-    Write-Error "Could not retrieve games database. Ensure Playnite is fully initialized."
-    return
-}
-$payload = @{ games = @() }
+Write-Host "Total games to sync: $($allGames.Count)"
 
-Write-Host "Gathering metadata for $($games.Count) games..."
-
-foreach ($g in $games) {
-    $source = if ($g.Source) { $g.Source.Name.ToLower() } else { "playnite" }
-    $lastPlayed = if ($g.LastActivity) { $g.LastActivity.ToString("yyyy-MM-ddTHH:mm:ssZ") } else { "" }
-    
-    $releaseDate = ""
-    if ($g.ReleaseDate) {
-        $rd = $g.ReleaseDate
-        if ($rd.Day -and $rd.Month) {
-            $releaseDate = "{0:D4}-{1:D2}-{2:D2}" -f $rd.Year, $rd.Month, $rd.Day
-        } elseif ($rd.Month) {
-            $releaseDate = "{0:D4}-{1:D2}-01" -f $rd.Year, $rd.Month
-        } else {
-            $releaseDate = "{0:D4}-01-01" -f $rd.Year
+for ($i = 0; $i -lt $allGames.Count; $i += $BatchSize) {
+    $batch = $allGames | Select-Object -Skip $i -First $BatchSize
+    $payload = @{ games = @() }
+    foreach ($g in $batch) {
+        if ($null -eq $g) { continue }
+        $source = if ($g.Source) { $g.Source.Name.ToLower() } else { "playnite" }
+        $lastPlayed = if ($g.LastActivity) { $g.LastActivity.ToString("yyyy-MM-ddTHH:mm:ssZ") } else { "" }
+        $releaseDate = ""
+        if ($g.ReleaseDate) {
+            $rd = $g.ReleaseDate; $mm = if ($rd.Month) { $rd.Month } else { 1 }; $dd = if ($rd.Day) { $rd.Day } else { 1 }
+            $releaseDate = "{0:D4}-{1:D2}-{2:D2}" -f $rd.Year, $mm, $dd
+        }
+        $platforms = if ($g.Platforms) { $g.Platforms | ForEach-Object { $_.Name.ToLower() } } else { @() }
+        $storeUrl = ""; if ($g.Links -and $g.Links.Count -gt 0) {
+            $storeUrl = ($g.Links | Where-Object { $_.Name -match "Store|Steam|GOG|Epic" } | Select-Object -First 1).Url
+            if (!$storeUrl) { $storeUrl = $g.Links[0].Url }
+        }
+        $desc = ""; if ($g.Description) {
+            $desc = [string]$g.Description; if ($desc.Length -gt 5000) { $desc = $desc.Substring(0, 5000) }
+            $desc = $desc -replace "`r", "" -replace "`n", " "
+        }
+        $payload.games += [PSCustomObject]@{
+            id = [string]$g.Id.ToString(); title = [string]$g.Name; source = [string]$source
+            store_id = [string]$g.GameId; store_url = [string]$storeUrl; play_time_minutes = [int]($g.Playtime / 60)
+            last_played = [string]$lastPlayed; release_date = [string]$releaseDate; description = $desc
+            windows = [bool]($platforms -contains "pc (windows)" -or $platforms -contains "windows")
+            mac = [bool]($platforms -contains "macos" -or $platforms -contains "mac")
+            linux = [bool]($platforms -contains "linux")
+            developer = if ($g.Developers) { [string]($g.Developers | Select-Object -First 1).Name } else { "" }
+            publisher = if ($g.Publishers) { [string]($g.Publishers | Select-Object -First 1).Name } else { "" }
         }
     }
-    
-    $platforms = if ($g.Platforms) { $g.Platforms | ForEach-Object { $_.Name.ToLower() } } else { @() }
-    $isWin = $platforms -contains "pc (windows)" -or $platforms -contains "windows"
-    $isMac = $platforms -contains "macos" -or $platforms -contains "mac"
-    $isLin = $platforms -contains "linux"
-
-    $item = @{
-        id = $g.Id.ToString()
-        title = $g.Name
-        source = $source
-        store_id = $g.GameId
-        store_url = $g.Link
-        play_time_minutes = [int]($g.Playtime / 60)
-        last_played = $lastPlayed
-        windows = $isWin
-        mac = $isMac
-        linux = $isLin
-        developer = if ($g.Developers) { ($g.Developers | Select-Object -First 1).Name } else { "" }
-        publisher = if ($g.Publishers) { ($g.Publishers | Select-Object -First 1).Name } else { "" }
-        release_date = $releaseDate
-        description = $g.Description
-    }
-    $payload.games += $item
-}
-
-$json = $payload | ConvertTo-Json -Depth 10
-$headers = @{ "Content-Type" = "application/json" }
-if ($ApiSecret) { $headers.Add("X-Nisaba-Secret", $ApiSecret) }
-
-Write-Host "Sending data to Nisaba at $NisabaUrl..."
-try {
-    $response = Invoke-RestMethod -Uri $NisabaUrl -Method Post -Body $json -Headers $headers
-    Write-Host "Sync Complete! Added: $($response.added), Updated: $($response.updated), Errors: $($response.errors)" -ForegroundColor Green
-} catch {
-    Write-Error "Sync failed: $_"
-    if ($_.Exception.Response) {
-        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-        $details = $reader.ReadToEnd()
-        Write-Host "Server Response: $details" -ForegroundColor Red
+    $json = $payload | ConvertTo-Json -Depth 10 -Compress
+    Write-Host "Batch $($i / $BatchSize + 1): " -NoNewline
+    try {
+        $headers = @{ "Content-Type" = "application/json" }
+        if ($ApiSecret) { $headers.Add("X-Nisaba-Secret", $ApiSecret) }
+        $resp = Invoke-RestMethod -Uri $NisabaUrl -Method Post -Body $json -Headers $headers
+        Write-Host "OK (+ $($resp.added), ~ $($resp.updated))" -ForegroundColor Green
+    } catch {
+        Write-Host "FAILED" -ForegroundColor Red; Write-Error "Error: $_"; break
     }
 }
             </textarea>

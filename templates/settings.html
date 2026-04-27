@@ -177,6 +177,18 @@
             <div id="gog-status" class="mt-2 text-sm"></div>
         </div>
 
+        <!-- ── Playnite Automated Sync ─────────────────────── -->
+        <div class="sync-card">
+            <div class="sync-card-title">Playnite Automated Sync</div>
+            <p class="text-xs text-gray-500 mb-3">Pre-shared secret used by the Playnite PowerShell script to authenticate. If unset, the sync endpoint is protected by the main app session.</p>
+            <div>
+                <label class="filter-heading">Sync Secret</label>
+                <input type="password" name="sync_api_secret"
+                    placeholder="{{ if .Config.SyncAPIKeySet }}(saved — leave blank to keep){{ else }}Playnite sync secret{{ end }}"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+            </div>
+        </div>
+
         <!-- ── Paths ──────────────────────────────────────────── -->
         <div class="sync-card">
             <div class="sync-card-title">Library File Paths</div>

@@ -730,10 +730,12 @@ func (h *Handler) SyncPlaynite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("SyncPlaynite: JSON decode error: %v", err)
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("SyncPlaynite: received %d games", len(req.Games))
 	logID, _ := h.store.StartSync("playnite")
 	var added, updated int
 	var errors []string
@@ -742,11 +744,13 @@ func (h *Handler) SyncPlaynite(w http.ResponseWriter, r *http.Request) {
 		// 1. Try to find the game by store link.
 		gameID, err := h.store.FindGameByStoreID(g.Source, g.StoreID)
 		if err != nil {
+			log.Printf("SyncPlaynite: db error searching for %s: %v", g.Title, err)
 			errors = append(errors, fmt.Sprintf("%s: db error searching: %v", g.Title, err))
 			continue
 		}
 
 		if gameID == "" {
+			log.Printf("SyncPlaynite: adding new game: %s", g.Title)
 			// New game from Playnite.
 			gameID = uuid.New().String()
 			err = h.store.InsertGame(db.InsertGameParams{
@@ -797,6 +801,7 @@ func (h *Handler) SyncPlaynite(w http.ResponseWriter, r *http.Request) {
 		_ = h.store.FinishSync(logID, status, added, updated, errMsg)
 	}
 
+	log.Printf("SyncPlaynite: finished. added=%d, updated=%d, errors=%d", added, updated, len(errors))
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"added":   added,
