@@ -115,12 +115,14 @@ All in `runMigrations()` in `main.go`:
 - `price_thresholds` table
 - `sync_errors` table + index
 - `wishlist_entries.best_price_url` — TEXT
+- Store Constraints: Removed hardcoded `CHECK` constraints on `store` columns via `migrateStoreConstraints()` to support arbitrary Playnite sources.
 
 ## Image Proxy
 All external images are served through `/img/proxy?url=...` to bypass corporate firewall CDN blocks. Disk cache at `/data/imgcache/`, 7-day TTL. The `proxyURL` template func handles encoding. CSS background images in `static/app.css` are also proxied.
 
 ## IGDB / Enrichment Notes
 - `bestMatch()` in `sync/igdb.go` prefers PC platform (platform ID 6) over mobile/console variants when multiple entries share the same normalised title — prevents matching iOS versions of games
+- Playnite Sync: Uses `FindGameByTitle` as a fallback deduplication strategy if no matching store link is found.
 - Steam cross-refs for non-Steam games: query IGDB `websites` field (not `external_games`) and parse `store.steampowered.com/app/NNNNN` URLs
 - Category 1 in `external_games` is NOT reliable for Steam — use `websites` field instead
 

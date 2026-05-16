@@ -54,8 +54,10 @@ schema.sql                 SQLite schema
 ### Sync pipeline
 
 ```
-Steam ownership → Playnite automated sync (replaces Heroic/GOG native) → IGDB enrichment → RAWG fallback → review queue
+Steam ownership → Playnite automated sync (Title-based deduplication fallback) → IGDB enrichment → RAWG fallback → review queue
 ```
+
+**Note:** The Playnite sync automatically excludes games in the "Steam Family Sharing" category to ensure only personal ownership is tracked.
 
 ### Pricing pipeline
 
