@@ -1,0 +1,25 @@
+{{ define "mystery_pack_game_add_partial.html" }}
+<div>
+    {{ if .NotFound }}
+    <div class="bg-amber-900 text-amber-300 p-3 rounded text-sm mb-4">
+        {{ .ErrorMessage }}
+    </div>
+    {{ end }}
+
+    <form hx-post="/mystery-packs/{{ .PackID }}/games/add" hx-target="#games-list" hx-swap="outerHTML" class="flex flex-col gap-3">
+        <div class="flex gap-2">
+            <input type="text" name="title" placeholder="Game Title (e.g., Baldur's Gate 3)" required {{ if .NotFound }}value="{{ .Title }}"{{ end }}
+                class="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-amber-500" />
+            <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded text-sm transition">
+                {{ if .NotFound }}Retry with Manual ID{{ else }}Add Game{{ end }}
+            </button>
+        </div>
+
+        {{ if .NotFound }}
+        <input type="text" name="steam_app_id" placeholder="Steam App ID (e.g., 1086940)" required
+            class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-amber-500" />
+        <p class="text-xs text-gray-500">Find the Steam App ID at store.steampowered.com/app/[ID]</p>
+        {{ end }}
+    </form>
+</div>
+{{ end }}

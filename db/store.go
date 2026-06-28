@@ -1749,6 +1749,15 @@ func (s *Store) FindGameByStoreID(store, storeID string) (string, error) {
 	return gameID, err
 }
 
+func (s *Store) FindGameByTitle(title string) (string, error) {
+	var id string
+	err := s.db.QueryRow(`SELECT id FROM games WHERE title = ? OR sort_title = ? LIMIT 1`, title, makeSortTitle(title)).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return id, err
+}
+
 // InsertGameParams holds fields for a new game record.
 type InsertGameParams struct {
 	ID               string
@@ -1880,3 +1889,629 @@ ON CONFLICT(game_id, title) DO NOTHING`,
 	)
 	return err
 }
+
+// ── Mystery packs ────────────────────────────────────────────────────────────
+
+type MysteryPackSite struct {
+	ID      string
+	Name    string
+	BaseURL string
+	Enabled bool
+}
+
+type MysteryPackRow struct {
+	ID               string
+	SiteID           string
+	SiteName         string
+	Name             string
+	URL              string
+	PackType         string
+	PriceUSD         *float64
+	KeyCount         int
+	Enabled          bool
+	LastPriced       *string
+	LastAnalyzed     *string
+	RecommendationBadge *string
+	ROIKeyshop       *float64
+	OverlapCount     *int
+}
+
+type MysteryPackGame struct {
+	Title            string
+	SteamAppID       *string
+	RetailPriceUSD   *float64
+	KeyshopPriceUSD  *float64
+	PriceUpdatedAt   *string
+}
+
+type MysteryPackAnalysis struct {
+	PackID            string
+	AnalyzedAt        string
+	PackPriceUSD      *float64
+	PoolSize          *int
+	OverlapCount      *int
+	NewGamesCount     *int
+	KeyshopValueTotal *float64
+	KeyshopValueNew   *float64
+	ROIKeyshop        *float64
+	ROIPerKey         *float64
+	VarianceScore     *int
+	Recommendation    *string
+	OverlapTitles     []string
+	NotableGames      []string
+}
+
+type MysteryPackDetail struct {
+	ID               string
+	SiteID           string
+	SiteName         string
+	Name             string
+	URL              string
+	PackType         string
+	PriceUSD         *float64
+	KeyCount         int
+	ValueSpec        string
+	Notes            *string
+	Enabled          bool
+	LastPriced       *string
+	Games            []MysteryPackGame
+	Analysis         *MysteryPackAnalysis
+}
+
+type MysteryPackParams struct {
+	ID        string
+	SiteID    string
+	Name      string
+	URL       string
+	PackType  string
+	PriceUSD  *float64
+	KeyCount  int
+	ValueSpec string
+	Notes     *string
+	Enabled   bool
+}
+
+type MysteryPackAnalysisParams struct {
+	PackID            string
+	AnalyzedAt        string
+	PackPriceUSD      *float64
+	PoolSize          *int
+	OverlapCount      *int
+	NewGamesCount     *int
+	KeyshopValueTotal *float64
+	KeyshopValueNew   *float64
+	ROIKeyshop        *float64
+	ROIPerKey         *float64
+	VarianceScore     *int
+	Recommendation    *string
+	OverlapTitles     []string
+	NotableGames      []string
+}
+
+type ScrapeQueue struct {
+	ID        string
+	ScrapedAt string
+	CreatedAt string
+	PagesJSON string
+	AppliedAt *string
+}
+
+type MysteryPackOffer struct {
+	PackID     string
+	SellerID   string
+	PriceUSD   float64
+	URL        *string
+	ValidUntil *string
+	UpdatedAt  string
+}
+
+type MysteryPackPriceHistoryRow struct {
+	ID         int64
+	PackID     string
+	SellerID   string
+	PriceUSD   float64
+	URL        *string
+	RecordedAt string
+}
+
+func (s *Store) ListMysteryPackSites() ([]MysteryPackSite, error) {
+	rows, err := s.db.Query(`
+SELECT id, name, base_url, enabled FROM mystery_pack_sites
+ORDER BY name ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []MysteryPackSite
+	for rows.Next() {
+		var site MysteryPackSite
+		if err := rows.Scan(&site.ID, &site.Name, &site.BaseURL, &site.Enabled); err != nil {
+			return nil, err
+		}
+		result = append(result, site)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) UpsertMysteryPackSite(id, name, baseURL string) error {
+	_, err := s.db.Exec(`
+INSERT INTO mystery_pack_sites (id, name, base_url, enabled)
+VALUES (?, ?, ?, 1)
+ON CONFLICT(id) DO UPDATE SET name = excluded.name, base_url = excluded.base_url`,
+		id, name, baseURL,
+	)
+	return err
+}
+
+func (s *Store) DeleteMysteryPackSite(id string) error {
+	_, err := s.db.Exec(`DELETE FROM mystery_pack_sites WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) ListMysteryPacks() ([]MysteryPackRow, error) {
+	rows, err := s.db.Query(`
+SELECT
+    mp.id, mp.site_id, mps.name, mp.name, mp.url, mp.pack_type,
+    mp.price_usd, mp.key_count, mp.enabled, mp.last_priced,
+    mpa.analyzed_at, mpa.recommendation, mpa.roi_keyshop, mpa.overlap_count
+FROM mystery_packs mp
+JOIN mystery_pack_sites mps ON mps.id = mp.site_id
+LEFT JOIN mystery_pack_analysis mpa ON mpa.pack_id = mp.id
+ORDER BY mps.name ASC, mp.name ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []MysteryPackRow
+	for rows.Next() {
+		var row MysteryPackRow
+		if err := rows.Scan(
+			&row.ID, &row.SiteID, &row.SiteName, &row.Name, &row.URL, &row.PackType,
+			&row.PriceUSD, &row.KeyCount, &row.Enabled, &row.LastPriced,
+			&row.LastAnalyzed, &row.RecommendationBadge, &row.ROIKeyshop, &row.OverlapCount,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) ListMysteryPacksBySite(siteID string) ([]MysteryPackRow, error) {
+	rows, err := s.db.Query(`
+SELECT
+    mp.id, mp.site_id, mps.name, mp.name, mp.url, mp.pack_type,
+    mp.price_usd, mp.key_count, mp.enabled, mp.last_priced,
+    mpa.analyzed_at, mpa.recommendation, mpa.roi_keyshop, mpa.overlap_count
+FROM mystery_packs mp
+JOIN mystery_pack_sites mps ON mps.id = mp.site_id
+LEFT JOIN mystery_pack_analysis mpa ON mpa.pack_id = mp.id
+WHERE mp.site_id = ?
+ORDER BY mp.name ASC`, siteID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []MysteryPackRow
+	for rows.Next() {
+		var row MysteryPackRow
+		if err := rows.Scan(
+			&row.ID, &row.SiteID, &row.SiteName, &row.Name, &row.URL, &row.PackType,
+			&row.PriceUSD, &row.KeyCount, &row.Enabled, &row.LastPriced,
+			&row.LastAnalyzed, &row.RecommendationBadge, &row.ROIKeyshop, &row.OverlapCount,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) GetMysteryPack(id string) (*MysteryPackDetail, error) {
+	var pack MysteryPackDetail
+	err := s.db.QueryRow(`
+SELECT
+    mp.id, mp.site_id, mps.name, mp.name, mp.url, mp.pack_type,
+    mp.price_usd, mp.key_count, mp.value_spec, mp.notes, mp.enabled, mp.last_priced
+FROM mystery_packs mp
+JOIN mystery_pack_sites mps ON mps.id = mp.site_id
+WHERE mp.id = ?`, id).Scan(
+		&pack.ID, &pack.SiteID, &pack.SiteName, &pack.Name, &pack.URL, &pack.PackType,
+		&pack.PriceUSD, &pack.KeyCount, &pack.ValueSpec, &pack.Notes, &pack.Enabled, &pack.LastPriced,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	games, err := s.ListMysteryPackGames(id)
+	if err != nil {
+		return nil, err
+	}
+	pack.Games = games
+
+	analysis, err := s.GetMysteryPackAnalysis(id)
+	if err != nil {
+		return nil, err
+	}
+	pack.Analysis = analysis
+
+	return &pack, nil
+}
+
+func (s *Store) UpsertMysteryPack(p MysteryPackParams) error {
+	var priceVal any
+	if p.PriceUSD != nil {
+		priceVal = *p.PriceUSD
+	}
+	var notesVal any
+	if p.Notes != nil {
+		notesVal = *p.Notes
+	}
+	_, err := s.db.Exec(`
+INSERT INTO mystery_packs (id, site_id, name, url, pack_type, price_usd, key_count, value_spec, notes, enabled, last_priced)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? IS NOT NULL THEN datetime('now') ELSE NULL END)
+ON CONFLICT(id) DO UPDATE SET
+    site_id = excluded.site_id,
+    name = excluded.name,
+    url = excluded.url,
+    pack_type = excluded.pack_type,
+    price_usd = excluded.price_usd,
+    key_count = excluded.key_count,
+    value_spec = excluded.value_spec,
+    notes = excluded.notes,
+    enabled = excluded.enabled,
+    last_priced = CASE WHEN excluded.price_usd IS NOT NULL THEN datetime('now') ELSE last_priced END`,
+		p.ID, p.SiteID, p.Name, p.URL, p.PackType, priceVal, p.KeyCount, p.ValueSpec, notesVal, p.Enabled, priceVal,
+	)
+	return err
+}
+
+func (s *Store) UpdateMysteryPackPrice(id string, priceUSD float64) error {
+	_, err := s.db.Exec(`
+UPDATE mystery_packs
+SET price_usd = ?, last_priced = datetime('now')
+WHERE id = ?`, priceUSD, id)
+	return err
+}
+
+func (s *Store) DeleteMysteryPack(id string) error {
+	_, err := s.db.Exec(`DELETE FROM mystery_packs WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) ListMysteryPackGames(packID string) ([]MysteryPackGame, error) {
+	rows, err := s.db.Query(`
+SELECT title, steam_app_id, retail_price_usd, keyshop_price_usd, price_updated_at
+FROM mystery_pack_games
+WHERE pack_id = ?
+ORDER BY title ASC`, packID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []MysteryPackGame
+	for rows.Next() {
+		var game MysteryPackGame
+		if err := rows.Scan(&game.Title, &game.SteamAppID, &game.RetailPriceUSD, &game.KeyshopPriceUSD, &game.PriceUpdatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, game)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) UpsertMysteryPackGame(packID, title, steamAppID string, retailPrice float64) error {
+	var appIDVal any
+	if steamAppID != "" {
+		appIDVal = steamAppID
+	}
+	var retailVal any
+	if retailPrice > 0 {
+		retailVal = retailPrice
+	}
+	_, err := s.db.Exec(`
+INSERT INTO mystery_pack_games (pack_id, title, steam_app_id, retail_price_usd)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(pack_id, title) DO UPDATE SET
+    steam_app_id = excluded.steam_app_id,
+    retail_price_usd = excluded.retail_price_usd`,
+		packID, title, appIDVal, retailVal,
+	)
+	return err
+}
+
+func (s *Store) UpdateMysteryPackGameKeyshopPrice(packID, title string, keyshopPrice float64, updatedAt string) error {
+	_, err := s.db.Exec(`
+UPDATE mystery_pack_games
+SET keyshop_price_usd = ?, price_updated_at = ?
+WHERE pack_id = ? AND title = ?`, keyshopPrice, updatedAt, packID, title)
+	return err
+}
+
+func (s *Store) DeleteMysteryPackGame(packID, title string) error {
+	_, err := s.db.Exec(`DELETE FROM mystery_pack_games WHERE pack_id = ? AND title = ?`, packID, title)
+	return err
+}
+
+func (s *Store) SaveMysteryPackAnalysis(a MysteryPackAnalysisParams) error {
+	overlapTitles, _ := json.Marshal(a.OverlapTitles)
+	notableGames, _ := json.Marshal(a.NotableGames)
+
+	_, err := s.db.Exec(`
+INSERT INTO mystery_pack_analysis (
+    pack_id, analyzed_at, pack_price_usd, pool_size, overlap_count, new_games_count,
+    keyshop_value_total, keyshop_value_new, roi_keyshop, roi_per_key, variance_score,
+    recommendation, overlap_titles, notable_games
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(pack_id) DO UPDATE SET
+    analyzed_at = excluded.analyzed_at,
+    pack_price_usd = excluded.pack_price_usd,
+    pool_size = excluded.pool_size,
+    overlap_count = excluded.overlap_count,
+    new_games_count = excluded.new_games_count,
+    keyshop_value_total = excluded.keyshop_value_total,
+    keyshop_value_new = excluded.keyshop_value_new,
+    roi_keyshop = excluded.roi_keyshop,
+    roi_per_key = excluded.roi_per_key,
+    variance_score = excluded.variance_score,
+    recommendation = excluded.recommendation,
+    overlap_titles = excluded.overlap_titles,
+    notable_games = excluded.notable_games`,
+		a.PackID, a.AnalyzedAt, a.PackPriceUSD, a.PoolSize, a.OverlapCount, a.NewGamesCount,
+		a.KeyshopValueTotal, a.KeyshopValueNew, a.ROIKeyshop, a.ROIPerKey, a.VarianceScore,
+		a.Recommendation, string(overlapTitles), string(notableGames),
+	)
+	return err
+}
+
+func (s *Store) GetMysteryPackAnalysis(packID string) (*MysteryPackAnalysis, error) {
+	var a MysteryPackAnalysis
+	var overlapTitlesJSON, notableGamesJSON []byte
+
+	err := s.db.QueryRow(`
+SELECT
+    pack_id, analyzed_at, pack_price_usd, pool_size, overlap_count, new_games_count,
+    keyshop_value_total, keyshop_value_new, roi_keyshop, roi_per_key, variance_score,
+    recommendation, COALESCE(overlap_titles, '[]'), COALESCE(notable_games, '[]')
+FROM mystery_pack_analysis
+WHERE pack_id = ?`, packID).Scan(
+		&a.PackID, &a.AnalyzedAt, &a.PackPriceUSD, &a.PoolSize, &a.OverlapCount, &a.NewGamesCount,
+		&a.KeyshopValueTotal, &a.KeyshopValueNew, &a.ROIKeyshop, &a.ROIPerKey, &a.VarianceScore,
+		&a.Recommendation, &overlapTitlesJSON, &notableGamesJSON,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	_ = json.Unmarshal(overlapTitlesJSON, &a.OverlapTitles)
+	_ = json.Unmarshal(notableGamesJSON, &a.NotableGames)
+
+	return &a, nil
+}
+
+func (s *Store) ListOwnedTitleIndex() (map[string]struct{}, error) {
+	rows, err := s.db.Query(`
+SELECT DISTINCT LOWER(TRIM(g.title))
+FROM games g
+JOIN game_stores gs ON gs.game_id = g.id
+WHERE gs.owned = 1
+ORDER BY g.title ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string]struct{})
+	for rows.Next() {
+		var title string
+		if err := rows.Scan(&title); err != nil {
+			return nil, err
+		}
+		result[title] = struct{}{}
+	}
+	return result, rows.Err()
+}
+
+// ListWishlistTitleIndex returns a map of normalized wishlist entry titles for local game matching.
+func (s *Store) ListWishlistTitleIndex() (map[string]struct{}, error) {
+	rows, err := s.db.Query(`
+SELECT DISTINCT LOWER(TRIM(title))
+FROM wishlist_entries`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string]struct{})
+	for rows.Next() {
+		var title string
+		if err := rows.Scan(&title); err != nil {
+			return nil, err
+		}
+		result[title] = struct{}{}
+	}
+	return result, rows.Err()
+}
+
+// Scrape queue management
+
+func (s *Store) CreateScrapeQueue(id, scrapedAt, createdAt, pagesJSON string) error {
+	_, err := s.db.Exec(`
+INSERT INTO mystery_pack_scrape_queues (id, scraped_at, created_at, pages_json, applied_at)
+VALUES (?, ?, ?, ?, NULL)`,
+		id, scrapedAt, createdAt, pagesJSON)
+	return err
+}
+
+func (s *Store) GetScrapeQueue(id string) (*ScrapeQueue, error) {
+	var q ScrapeQueue
+	var appliedAt sql.NullString
+	err := s.db.QueryRow(`
+SELECT id, scraped_at, created_at, pages_json, applied_at
+FROM mystery_pack_scrape_queues
+WHERE id = ?`,
+		id).Scan(&q.ID, &q.ScrapedAt, &q.CreatedAt, &q.PagesJSON, &appliedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if appliedAt.Valid {
+		q.AppliedAt = &appliedAt.String
+	}
+	return &q, nil
+}
+
+func (s *Store) MarkQueueApplied(id, appliedAt string) error {
+	_, err := s.db.Exec(`
+UPDATE mystery_pack_scrape_queues
+SET applied_at = ?
+WHERE id = ?`,
+		appliedAt, id)
+	return err
+}
+
+func (s *Store) DeleteExpiredScrapeQueues(olderThan string) error {
+	_, err := s.db.Exec(`
+DELETE FROM mystery_pack_scrape_queues
+WHERE created_at < ?`,
+		olderThan)
+	return err
+}
+
+// Pack lookup
+
+func (s *Store) GetMysteryPackBySiteAndTitle(siteID, normalizedTitle string) (*MysteryPackRow, error) {
+	rows, err := s.db.Query(`
+SELECT id, site_id, name, url, pack_type, price_usd, key_count, enabled
+FROM mystery_packs
+WHERE site_id = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?))
+LIMIT 1`,
+		siteID, normalizedTitle)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil
+	}
+	var p MysteryPackRow
+	if err := rows.Scan(&p.ID, &p.SiteID, &p.Name, &p.URL, &p.PackType, &p.PriceUSD, &p.KeyCount, &p.Enabled); err != nil {
+		return nil, err
+	}
+	return &p, rows.Err()
+}
+
+// Offers (current per-seller prices)
+
+func (s *Store) UpsertMysteryPackOffer(packID, sellerID string, priceUSD float64, url, validUntil, updatedAt string) error {
+	_, err := s.db.Exec(`
+INSERT INTO mystery_pack_offers (pack_id, seller_id, price_usd, url, valid_until, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(pack_id, seller_id) DO UPDATE SET
+	price_usd = excluded.price_usd,
+	url = excluded.url,
+	valid_until = excluded.valid_until,
+	updated_at = excluded.updated_at`,
+		packID, sellerID, priceUSD, url, validUntil, updatedAt)
+	return err
+}
+
+func (s *Store) ListMysteryPackOffers(packID string) ([]MysteryPackOffer, error) {
+	rows, err := s.db.Query(`
+SELECT pack_id, seller_id, price_usd, url, valid_until, updated_at
+FROM mystery_pack_offers
+WHERE pack_id = ?
+ORDER BY price_usd ASC`,
+		packID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []MysteryPackOffer
+	for rows.Next() {
+		var o MysteryPackOffer
+		var url, validUntil sql.NullString
+		if err := rows.Scan(&o.PackID, &o.SellerID, &o.PriceUSD, &url, &validUntil, &o.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if url.Valid {
+			o.URL = &url.String
+		}
+		if validUntil.Valid {
+			o.ValidUntil = &validUntil.String
+		}
+		result = append(result, o)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) DeleteMysteryPackOffer(packID, sellerID string) error {
+	_, err := s.db.Exec(`
+DELETE FROM mystery_pack_offers
+WHERE pack_id = ? AND seller_id = ?`,
+		packID, sellerID)
+	return err
+}
+
+// Price history
+
+func (s *Store) InsertPriceHistory(packID, sellerID string, priceUSD float64, url, recordedAt string) error {
+	_, err := s.db.Exec(`
+INSERT INTO mystery_pack_price_history (pack_id, seller_id, price_usd, url, recorded_at)
+VALUES (?, ?, ?, ?, ?)`,
+		packID, sellerID, priceUSD, url, recordedAt)
+	return err
+}
+
+func (s *Store) ListPriceHistory(packID string) ([]MysteryPackPriceHistoryRow, error) {
+	rows, err := s.db.Query(`
+SELECT id, pack_id, seller_id, price_usd, url, recorded_at
+FROM mystery_pack_price_history
+WHERE pack_id = ?
+ORDER BY recorded_at DESC`,
+		packID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []MysteryPackPriceHistoryRow
+	for rows.Next() {
+		var h MysteryPackPriceHistoryRow
+		var url sql.NullString
+		if err := rows.Scan(&h.ID, &h.PackID, &h.SellerID, &h.PriceUSD, &url, &h.RecordedAt); err != nil {
+			return nil, err
+		}
+		if url.Valid {
+			h.URL = &url.String
+		}
+		result = append(result, h)
+	}
+	return result, rows.Err()
+}
+
+// SyncPackLowestPrice updates the pack's price_usd to the MIN of current offers.
+func (s *Store) SyncPackLowestPrice(packID string) error {
+	_, err := s.db.Exec(`
+UPDATE mystery_packs
+SET price_usd = (SELECT MIN(price_usd) FROM mystery_pack_offers WHERE pack_id = ?)
+WHERE id = ?`, packID, packID)
+	return err
+}
+
+// makeSortTitle strips leading articles for alphabetical sorting.
+func makeSortTitle(title string) string {
+	lower := strings.ToLower(title)
+	for _, prefix := range []string{"the ", "a ", "an "} {
+		if strings.HasPrefix(lower, prefix) {
+			return strings.TrimSpace(title[len(prefix):])
+		}
+	}
+	return title
+}
+

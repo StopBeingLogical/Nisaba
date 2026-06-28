@@ -1,4 +1,26 @@
-# NISABA Changelog
+# NISABA — Changelog
+
+**Top-level only:** Major features, significant integrations, deployment changes.
+
+For detailed changes, see subdirectory changelogs:
+- `db/CHANGELOG.md` — Schema & migrations
+- `handlers/CHANGELOG.md` — HTTP handlers & features
+- `sync/CHANGELOG.md` — Sync pipelines & integrations
+- `schema/CHANGELOG.md` — Design documentation
+
+---
+
+## [Unreleased]
+
+### Added
+- **Mystery Pack Scraper Integration** — 3-stage stateful API (Queue, Review, Apply) for importing game packs from keyshops.
+- **Chrome Extension** — Manifest V3 scraper for G2A (and others) with batch collection and interactive diff review dashboard.
+- **Dynamic Price Tracking** — Automated tracking of multi-seller offers and historical price snapshots for mystery packs.
+
+### Changed
+- Refactored `sync_log` type checking to support mystery pack sync events.
+
+---
 
 ## 2026-03-12
 

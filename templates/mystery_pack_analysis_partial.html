@@ -1,0 +1,113 @@
+{{ define "mystery_pack_analysis_partial.html" }}
+<div id="analysis-card" class="sync-card">
+    <div class="sync-card-title mb-4">Analysis Results</div>
+
+    {{ if .Analysis.Errors }}
+    <div class="bg-red-900 text-red-300 p-3 rounded text-sm">
+        {{ range .Analysis.Errors }}<div>{{ . }}</div>{{ end }}
+    </div>
+    {{ else }}
+
+    <!-- Recommendation Badge -->
+    <div class="mb-4 flex items-center gap-3">
+        {{ if eq .Analysis.Recommendation "STRONG BUY" }}
+        <span class="badge badge-strongbuy text-sm">{{ .Analysis.Recommendation }}</span>
+        {{ else if eq .Analysis.Recommendation "BUY" }}
+        <span class="badge badge-buy text-sm">{{ .Analysis.Recommendation }}</span>
+        {{ else if eq .Analysis.Recommendation "CONSIDER" }}
+        <span class="badge badge-consider text-sm">{{ .Analysis.Recommendation }}</span>
+        {{ else if eq .Analysis.Recommendation "SKIP" }}
+        <span class="badge badge-skip text-sm">{{ .Analysis.Recommendation }}</span>
+        {{ else }}
+        <span class="badge badge-avoid text-sm">{{ .Analysis.Recommendation }}</span>
+        {{ end }}
+        <span class="text-sm text-gray-400">
+            {{ printf "%.2f" .Analysis.ROIKeyshop }}x ROI · ${{ printf "%.2f" .Analysis.ROIPerKey }}/key avg
+        </span>
+    </div>
+
+    <!-- Value Breakdown -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+        <div class="bg-gray-800 p-3 rounded">
+            <div class="text-gray-500 text-xs">Keyshop Value (New)</div>
+            <div class="font-semibold text-amber-400">${{ printf "%.2f" .Analysis.KeyshopValueNew }}</div>
+        </div>
+        <div class="bg-gray-800 p-3 rounded">
+            <div class="text-gray-500 text-xs">Pack Cost</div>
+            <div class="font-semibold">${{ printf "%.2f" .Analysis.PackPriceUSD }}</div>
+        </div>
+        <div class="bg-gray-800 p-3 rounded">
+            <div class="text-gray-500 text-xs">New Games</div>
+            <div class="font-semibold">{{ .Analysis.NewGamesCount }} / {{ .Analysis.PoolSize }}</div>
+        </div>
+        <div class="bg-gray-800 p-3 rounded">
+            <div class="text-gray-500 text-xs">Already Own</div>
+            <div class="font-semibold">{{ .Analysis.OverlapCount }}</div>
+        </div>
+    </div>
+
+    <!-- Variance Score -->
+    <div class="mb-4">
+        <div class="text-sm text-gray-400 mb-2">Variance Score</div>
+        <div class="flex items-center gap-2">
+            <div class="flex gap-1">
+                {{ range $i := (seq 1 5) }}
+                {{ if le $i $.Analysis.VarianceScore }}
+                <div class="h-2 w-4 bg-red-500 rounded-sm"></div>
+                {{ else }}
+                <div class="h-2 w-4 bg-gray-700 rounded-sm"></div>
+                {{ end }}
+                {{ end }}
+            </div>
+            <span class="text-xs text-gray-500">
+                {{ if le $.Analysis.VarianceScore 1 }}Very Stable{{ else if le $.Analysis.VarianceScore 2 }}Stable{{ else if le $.Analysis.VarianceScore 3 }}Moderate{{ else if le $.Analysis.VarianceScore 4 }}High{{ else }}Very High{{ end }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Notable Games (Top 5 by value) -->
+    {{ if .Analysis.NotableGames }}
+    <div class="mb-4">
+        <div class="text-sm font-semibold mb-2">Highest Value New Games</div>
+        <div class="text-xs text-gray-400 space-y-1">
+            {{ range .Analysis.NotableGames }}
+            <div>• {{ . }}</div>
+            {{ end }}
+        </div>
+    </div>
+    {{ end }}
+
+    <!-- Overlap List -->
+    {{ if .Analysis.OverlapTitles }}
+    <div class="mb-4">
+        <div class="text-sm font-semibold mb-2">Games You Already Own</div>
+        <div class="text-xs text-gray-400 space-y-1 max-h-32 overflow-y-auto">
+            {{ range .Analysis.OverlapTitles }}
+            <div>• {{ . }}</div>
+            {{ end }}
+        </div>
+    </div>
+    {{ end }}
+
+    <div class="text-xs text-gray-600 mt-4 pt-4 border-t border-gray-700">
+        Analyzed: {{ if .Analysis.AnalyzedAt }}{{ .Analysis.AnalyzedAt }}{{ else }}just now{{ end }}
+    </div>
+
+    {{ end }}
+</div>
+
+<style>
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.badge-strongbuy { background-color: rgb(20, 83, 45); color: rgb(134, 239, 172); }
+.badge-buy { background-color: rgb(15, 118, 110); color: rgb(134, 239, 191); }
+.badge-consider { background-color: rgb(78, 65, 12); color: rgb(253, 224, 71); }
+.badge-skip { background-color: rgb(55, 65, 81); color: rgb(209, 213, 219); }
+.badge-avoid { background-color: rgb(127, 29, 29); color: rgb(254, 202, 202); }
+</style>
+{{ end }}

@@ -105,6 +105,18 @@ func main() {
 	r.Get("/wishlist/{id}", h.WishlistDetail)
 	r.Get("/sync/status", h.SyncStatus) // polled by HTMX while syncs run
 
+	// ── Extension scrape API (no auth, raw data only) ─────────
+	r.Post("/api/mystery-packs/scrape/queue", h.ScrapeQueue)
+	r.Get("/api/mystery-packs/scrape/review", h.ScrapeReview)
+	r.Post("/api/mystery-packs/scrape/apply", h.ScrapeApply)
+	r.Post("/api/sync/playnite", h.SyncPlaynite)
+
+	// Game lookup route (needs to accept OPTIONS for CORS preflight)
+	r.Route("/api/mystery-packs/lookup-game", func(r chi.Router) {
+		r.Post("/", h.LookupGameSteamID)
+		r.Options("/", h.LookupGameSteamID)
+	})
+
 	// ── Protected routes (auth required) ─────────────────────
 	r.Group(func(r chi.Router) {
 		r.Use(h.AuthMiddleware)
@@ -155,6 +167,18 @@ func main() {
 		r.Post("/auth/gog/exchange", h.GOGAuthExchange)
 		r.Post("/auth/gog/push", h.GOGAuthPush)
 
+		// Mystery packs
+		r.Get("/mystery-packs", h.MysteryPacks)
+		r.Get("/mystery-packs/{id}", h.MysteryPackDetail)
+		r.Post("/mystery-packs/sites/add", h.AddMysteryPackSite)
+		r.Post("/mystery-packs/add", h.AddMysteryPack)
+		r.Post("/mystery-packs/{id}/games/add", h.AddPackGame)
+		r.Post("/mystery-packs/{id}/games/{title}/remove", h.RemovePackGame)
+		r.Post("/mystery-packs/{id}/price", h.UpdatePackPrice)
+		r.Post("/mystery-packs/{id}/delete", h.DeleteMysteryPack)
+		r.Post("/mystery-packs/{id}/analyze", h.AnalyzePack)
+		r.Post("/sync/mystery-packs", h.SyncMysteryPacks)
+
 		// Settings
 		r.Get("/settings", h.Settings)
 		r.Post("/settings", h.SaveSettings)
@@ -201,6 +225,74 @@ func runMigrations(sqlDB *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_sync_errors_type ON sync_errors (sync_type, id DESC)`,
 		`ALTER TABLE wishlist_entries ADD COLUMN best_price_url TEXT`,
+		`CREATE TABLE IF NOT EXISTS mystery_pack_sites (
+			id       TEXT PRIMARY KEY,
+			name     TEXT NOT NULL,
+			base_url TEXT NOT NULL,
+			enabled  INTEGER NOT NULL DEFAULT 1
+		)`,
+		`CREATE TABLE IF NOT EXISTS mystery_packs (
+			id         TEXT PRIMARY KEY,
+			site_id    TEXT NOT NULL REFERENCES mystery_pack_sites(id) ON DELETE CASCADE,
+			name       TEXT NOT NULL,
+			url        TEXT NOT NULL,
+			pack_type  TEXT NOT NULL CHECK (pack_type IN ('set_list','min_value')),
+			price_usd  REAL,
+			key_count  INTEGER NOT NULL DEFAULT 10,
+			value_spec TEXT NOT NULL DEFAULT '{}',
+			notes      TEXT,
+			enabled    INTEGER NOT NULL DEFAULT 1,
+			last_priced TEXT
+		)`,
+		`CREATE TABLE IF NOT EXISTS mystery_pack_games (
+			pack_id           TEXT NOT NULL REFERENCES mystery_packs(id) ON DELETE CASCADE,
+			title             TEXT NOT NULL,
+			steam_app_id      TEXT,
+			retail_price_usd  REAL,
+			keyshop_price_usd REAL,
+			price_updated_at  TEXT,
+			PRIMARY KEY (pack_id, title)
+		)`,
+		`CREATE TABLE IF NOT EXISTS mystery_pack_analysis (
+			pack_id              TEXT PRIMARY KEY REFERENCES mystery_packs(id) ON DELETE CASCADE,
+			analyzed_at          TEXT NOT NULL,
+			pack_price_usd       REAL,
+			pool_size            INTEGER,
+			overlap_count        INTEGER,
+			new_games_count      INTEGER,
+			keyshop_value_total  REAL,
+			keyshop_value_new    REAL,
+			roi_keyshop          REAL,
+			roi_per_key          REAL,
+			variance_score       INTEGER,
+			recommendation       TEXT,
+			overlap_titles       TEXT,
+			notable_games        TEXT
+		)`,
+		`CREATE TABLE IF NOT EXISTS mystery_pack_scrape_queues (
+			id         TEXT PRIMARY KEY,
+			scraped_at TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			pages_json TEXT NOT NULL,
+			applied_at TEXT
+		)`,
+		`CREATE TABLE IF NOT EXISTS mystery_pack_offers (
+			pack_id    TEXT NOT NULL REFERENCES mystery_packs(id) ON DELETE CASCADE,
+			seller_id  TEXT NOT NULL REFERENCES mystery_pack_sites(id) ON DELETE CASCADE,
+			price_usd  REAL NOT NULL,
+			url        TEXT,
+			valid_until TEXT,
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (pack_id, seller_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS mystery_pack_price_history (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			pack_id    TEXT NOT NULL REFERENCES mystery_packs(id) ON DELETE CASCADE,
+			seller_id  TEXT NOT NULL,
+			price_usd  REAL NOT NULL,
+			url        TEXT,
+			recorded_at TEXT NOT NULL
+		)`,
 	}
 	for _, stmt := range additive {
 		if _, err := sqlDB.Exec(stmt); err != nil {
@@ -208,6 +300,80 @@ func runMigrations(sqlDB *sql.DB) error {
 				return err
 			}
 		}
+	}
+	return migrateStoreConstraints(sqlDB)
+}
+
+// migrateStoreConstraints drops the hardcoded CHECK constraints on store columns
+// to allow arbitrary storefronts from Playnite.
+func migrateStoreConstraints(db *sql.DB) error {
+	var sqlText string
+	err := db.QueryRow("SELECT sql FROM sqlite_master WHERE type='table' AND name='game_stores'").Scan(&sqlText)
+	if err != nil {
+		return err
+	}
+	
+	// If the schema still has the CHECK constraint, rebuild the tables.
+	if strings.Contains(sqlText, "CHECK (store IN") {
+		log.Println("Migrating database to remove store CHECK constraints...")
+		_, err = db.Exec(`
+			PRAGMA foreign_keys=off;
+			BEGIN TRANSACTION;
+			
+			-- game_stores
+			ALTER TABLE game_stores RENAME TO _game_stores_old;
+			CREATE TABLE game_stores (
+				game_id     TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+				store       TEXT NOT NULL,
+				store_id    TEXT,
+				store_url   TEXT,
+				owned       INTEGER NOT NULL DEFAULT 1,
+				owned_since TEXT,
+				PRIMARY KEY (game_id, store)
+			);
+			INSERT INTO game_stores SELECT * FROM _game_stores_old;
+			DROP TABLE _game_stores_old;
+			CREATE INDEX idx_game_stores_store    ON game_stores(store);
+			CREATE INDEX idx_game_stores_owned    ON game_stores(owned);
+			CREATE INDEX idx_game_stores_store_id ON game_stores(store_id);
+
+			-- game_install_sources
+			ALTER TABLE game_install_sources RENAME TO _game_install_sources_old;
+			CREATE TABLE game_install_sources (
+				game_id            TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+				device_id          TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+				volume_id          TEXT REFERENCES storage_volumes(id),
+				install_path       TEXT,
+				install_size_bytes INTEGER,
+				runner             TEXT,
+				last_seen          TEXT NOT NULL DEFAULT (datetime('now')),
+				PRIMARY KEY (game_id, device_id)
+			);
+			INSERT INTO game_install_sources SELECT * FROM _game_install_sources_old;
+			DROP TABLE _game_install_sources_old;
+			CREATE INDEX idx_install_sources_game_id   ON game_install_sources(game_id);
+			CREATE INDEX idx_install_sources_device_id ON game_install_sources(device_id);
+
+			-- wishlist_stores
+			ALTER TABLE wishlist_stores RENAME TO _wishlist_stores_old;
+			CREATE TABLE wishlist_stores (
+				wishlist_id TEXT NOT NULL REFERENCES wishlist_entries(id) ON DELETE CASCADE,
+				store       TEXT NOT NULL,
+				store_id    TEXT,
+				store_url   TEXT,
+				PRIMARY KEY (wishlist_id, store)
+			);
+			INSERT INTO wishlist_stores SELECT * FROM _wishlist_stores_old;
+			DROP TABLE _wishlist_stores_old;
+
+			COMMIT;
+			PRAGMA foreign_keys=on;
+		`)
+		if err != nil {
+			log.Printf("Migration failed: %v", err)
+			return err
+		}
+		log.Println("Store constraint migration complete.")
 	}
 	return nil
 }

@@ -59,6 +59,15 @@ type simpleJobState struct {
 	lastMsg string
 }
 
+// mysteryPackState tracks a running mystery pack sync job.
+type mysteryPackState struct {
+	mu      sync.Mutex
+	running bool
+	done    int
+	total   int
+	lastMsg string
+}
+
 // Handler holds shared dependencies for all HTTP handlers.
 type Handler struct {
 	store   *db.Store
@@ -68,18 +77,19 @@ type Handler struct {
 	// (fragments that are never full-page renders and have no "content" block).
 	partials *template.Template
 	// igdb and rawg are lazily initialised on first enrichment run.
-	igdb       *storesync.IGDBClient
-	igdbMu     sync.Mutex
-	rawg       *storesync.RAWGClient
-	rawgMu     sync.Mutex
-	enrichment enrichState
-	pricing    pricingState
-	wishlist   wishlistState
-	syncAll    syncAllState
-	deck       simpleJobState
-	proton     simpleJobState
-	crossref   simpleJobState
-	dataDir    string
+	igdb        *storesync.IGDBClient
+	igdbMu      sync.Mutex
+	rawg        *storesync.RAWGClient
+	rawgMu      sync.Mutex
+	enrichment  enrichState
+	pricing     pricingState
+	wishlist    wishlistState
+	syncAll     syncAllState
+	deck        simpleJobState
+	proton      simpleJobState
+	crossref    simpleJobState
+	mysteryPack mysteryPackState
+	dataDir     string
 }
 
 // New creates a Handler. tmplFS is the embed.FS subtree for templates/.
@@ -94,6 +104,9 @@ func New(store *db.Store, tmplFS fs.FS, funcMap template.FuncMap, dataDir string
 			"sync_status_partial.html",
 			"review_results_partial.html",
 			"settings_thresholds_partial.html",
+			"mystery_pack_analysis_partial.html",
+			"mystery_pack_game_add_partial.html",
+			"mystery_pack_games_section_partial.html",
 		),
 	)
 	return &Handler{store: store, tmplFS: tmplFS, funcMap: funcMap, partials: partials, dataDir: dataDir}
@@ -121,6 +134,9 @@ var partials = []string{
 	"sync_status_partial.html",
 	"review_results_partial.html",
 	"settings_thresholds_partial.html",
+	"mystery_pack_analysis_partial.html",
+	"mystery_pack_game_add_partial.html",
+	"mystery_pack_games_section_partial.html",
 }
 
 // render parses base.html + the named page template + all partials fresh per
@@ -163,6 +179,20 @@ func TemplateFuncMap() template.FuncMap {
 		"iterate":         iterate,
 		"sparkline":       sparkline,
 		"storeShortLabel": storeShortLabel,
+		"seq":             seq,
+		"dict":            dict,
+		"ptrFloat": func(p *float64) float64 {
+			if p == nil {
+				return 0
+			}
+			return *p
+		},
+		"ptrStr": func(p *string) string {
+			if p == nil {
+				return ""
+			}
+			return *p
+		},
 		"proxyURL": func(u string) string {
 			if u == "" {
 				return ""
@@ -293,4 +323,27 @@ func iterate(start, end int) []int {
 		result = append(result, i)
 	}
 	return result
+}
+
+func seq(start, end int) []int {
+	result := make([]int, 0, end-start+1)
+	for i := start; i <= end; i++ {
+		result = append(result, i)
+	}
+	return result
+}
+
+func dict(values ...interface{}) (map[string]interface{}, error) {
+	if len(values)%2 != 0 {
+		return nil, fmt.Errorf("dict: uneven number of arguments")
+	}
+	result := make(map[string]interface{})
+	for i := 0; i < len(values); i += 2 {
+		key, ok := values[i].(string)
+		if !ok {
+			return nil, fmt.Errorf("dict: key at index %d is not a string", i)
+		}
+		result[key] = values[i+1]
+	}
+	return result, nil
 }

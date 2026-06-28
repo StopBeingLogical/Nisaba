@@ -122,6 +122,30 @@ a             { color: inherit; text-decoration: none; }
     background-color: #0074e4;
     background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fubisoft%2Fffffff');
 }
+.store-xbox {
+    background-color: #107c10;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fxbox%2Fffffff');
+}
+.store-battlenet {
+    background-color: #00aeff;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fbattledotnet%2Fffffff');
+}
+.store-itch {
+    background-color: #fa5c5c;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Fitchdotio%2Fffffff');
+}
+.store-rockstar {
+    background-color: #fca524;
+    background-image: url('/img/proxy?url=https%3A%2F%2Fcdn.simpleicons.org%2Frockstargames%2F000000');
+}
+.store-playnite {
+    background-color: #ff5200;
+    font-size: 8px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+}
+.store-playnite::after { content: "PN"; }
 /* Fanatical not in Simple Icons — use a text abbreviation */
 .store-fanatical {
     background-color: #e4000f;

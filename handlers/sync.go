@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	storesync "nisaba/sync"
 	"nisaba/db"
 )
@@ -692,6 +693,132 @@ func (h *Handler) SyncGOGWishlist(w http.ResponseWriter, r *http.Request) {
 	h.renderPartial(w, "sync_status_partial.html", status)
 }
 
+// SyncPlaynite accepts a JSON payload from a Playnite script and records
+// game metadata and ownership.
+func (h *Handler) SyncPlaynite(w http.ResponseWriter, r *http.Request) {
+	// Simple API secret check for automated syncs.
+	secret, _ := h.store.GetConfig("sync.api_secret")
+	if secret != "" {
+		provided := r.Header.Get("X-Nisaba-Secret")
+		if provided != secret {
+			http.Error(w, "invalid secret", http.StatusUnauthorized)
+			return
+		}
+	} else if !h.validSession(r) {
+		http.Error(w, "auth required", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Games []struct {
+			ID               string   `json:"id"`
+			Title            string   `json:"title"`
+			Source           string   `json:"source"`
+			StoreID          string   `json:"store_id"`
+			StoreURL         string   `json:"store_url"`
+			PlayTimeMinutes  int      `json:"play_time_minutes"`
+			LastPlayed       string   `json:"last_played"` // ISO8601
+			Windows          bool     `json:"windows"`
+			Mac              bool     `json:"mac"`
+			Linux            bool     `json:"linux"`
+			Developer        string   `json:"developer"`
+			Publisher        string   `json:"publisher"`
+			ReleaseDate      string   `json:"release_date"`
+			Description      string   `json:"description"`
+			ShortDescription string   `json:"short_description"`
+		} `json:"games"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("SyncPlaynite: JSON decode error: %v", err)
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("SyncPlaynite: received %d games", len(req.Games))
+	logID, _ := h.store.StartSync("playnite")
+	var added, updated int
+	var errors []string
+
+	for _, g := range req.Games {
+		// 1. Try to find the game by store link.
+		gameID, err := h.store.FindGameByStoreID(g.Source, g.StoreID)
+		if err != nil {
+			log.Printf("SyncPlaynite: db error searching for %s: %v", g.Title, err)
+			errors = append(errors, fmt.Sprintf("%s: db error searching: %v", g.Title, err))
+			continue
+		}
+
+		if gameID == "" {
+			// Fallback: Try to find by title to prevent duplicates if store link is new.
+			gameID, err = h.store.FindGameByTitle(g.Title)
+			if err != nil {
+				log.Printf("SyncPlaynite: db error searching by title for %s: %v", g.Title, err)
+			}
+			if gameID != "" {
+				log.Printf("SyncPlaynite: matched %s by title (no store link found)", g.Title)
+			}
+		}
+
+		if gameID == "" {
+			gameID = uuid.New().String()
+			err = h.store.InsertGame(db.InsertGameParams{
+				ID:               gameID,
+				Title:            g.Title,
+				SortTitle:        makeSortTitleH(g.Title),
+				Developer:        &g.Developer,
+				Description:      &g.Description,
+				ShortDescription: &g.ShortDescription,
+				ReleaseDate:      &g.ReleaseDate,
+				Windows:          g.Windows,
+				Mac:              g.Mac,
+				Linux:            g.Linux,
+				ArtworkJSON:      "{}",
+			})
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s: failed to insert: %v", g.Title, err))
+				continue
+			}
+			added++
+		} else {
+			updated++
+		}
+
+		// 2. Upsert store link.
+		_ = h.store.UpsertGameStoreLink(gameID, g.Source, g.StoreID, g.StoreURL)
+
+		// 3. Update playtime/last played if greater/later.
+		if g.PlayTimeMinutes > 0 {
+			_ = h.store.UpdatePlayTimeIfGreater(gameID, g.PlayTimeMinutes)
+		}
+		if g.LastPlayed != "" {
+			if t, err := time.Parse(time.RFC3339, g.LastPlayed); err == nil {
+				_ = h.store.UpdateLastPlayedIfLater(gameID, t)
+			}
+		}
+	}
+
+	if logID > 0 {
+		status := "done"
+		errMsg := ""
+		if len(errors) > 0 {
+			status = "partial"
+			errMsg = fmt.Sprintf("%d errors encountered", len(errors))
+			runID := time.Now().Format(time.RFC3339)
+			_ = h.store.AppendSyncErrors("playnite", runID, errors)
+		}
+		_ = h.store.FinishSync(logID, status, added, updated, errMsg)
+	}
+
+	log.Printf("SyncPlaynite: finished. added=%d, updated=%d, errors=%d", added, updated, len(errors))
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"added":   added,
+		"updated": updated,
+		"errors":  len(errors),
+	})
+}
+
 // currentSyncStatus snapshots all running-state flags into a syncStatusData.
 // Used both by SyncStatus (polling) and SyncPanel (initial page load).
 func (h *Handler) currentSyncStatus() syncStatusData {
@@ -766,6 +893,13 @@ func (h *Handler) currentSyncStatus() syncStatusData {
 	crossrefMsg := h.crossref.lastMsg
 	h.crossref.mu.Unlock()
 
+	h.mysteryPack.mu.Lock()
+	mysteryPackRunning := h.mysteryPack.running
+	mysteryPackDone := h.mysteryPack.done
+	mysteryPackTotal := h.mysteryPack.total
+	mysteryPackMsg := h.mysteryPack.lastMsg
+	h.mysteryPack.mu.Unlock()
+
 	switch {
 	case crossrefRunning:
 		return syncStatusData{
@@ -799,6 +933,19 @@ func (h *Handler) currentSyncStatus() syncStatusData {
 			StepTotal: protonTotal,
 			StepPct:   pct,
 		}
+	case mysteryPackRunning:
+		pct := 0
+		if mysteryPackTotal > 0 {
+			pct = mysteryPackDone * 100 / mysteryPackTotal
+		}
+		return syncStatusData{
+			Running:   true,
+			Message:   "Analyzing mystery packs…",
+			Step:      "GG.deals API",
+			StepDone:  mysteryPackDone,
+			StepTotal: mysteryPackTotal,
+			StepPct:   pct,
+		}
 	case syncAllMsg != "":
 		return syncStatusData{Running: false, LastMessage: syncAllMsg}
 	case wishlistMsg != "":
@@ -811,6 +958,8 @@ func (h *Handler) currentSyncStatus() syncStatusData {
 		return syncStatusData{Running: false, LastMessage: deckMsg}
 	case protonMsg != "":
 		return syncStatusData{Running: false, LastMessage: protonMsg}
+	case mysteryPackMsg != "":
+		return syncStatusData{Running: false, LastMessage: mysteryPackMsg}
 	default:
 		return syncStatusData{Running: false, LastMessage: enrichMsg}
 	}
@@ -1230,4 +1379,70 @@ func (h *Handler) ImportHeroic(w http.ResponseWriter, r *http.Request) {
 	// Return the status partial showing the result.
 	status := syncStatusData{Running: false, LastMessage: msg}
 	h.renderPartial(w, "sync_status_partial.html", status)
+}
+
+// SyncMysteryPacks analyzes all enabled mystery packs and persists results to the database.
+func (h *Handler) SyncMysteryPacks(w http.ResponseWriter, r *http.Request) {
+	h.mysteryPack.mu.Lock()
+	already := h.mysteryPack.running
+	h.mysteryPack.mu.Unlock()
+	if already {
+		h.renderPartial(w, "sync_status_partial.html", syncStatusData{Running: true, Message: "Mystery pack analysis already running…"})
+		return
+	}
+
+	h.mysteryPack.mu.Lock()
+	h.mysteryPack.running = true
+	h.mysteryPack.done = 0
+	h.mysteryPack.total = 0
+	h.mysteryPack.lastMsg = ""
+	h.mysteryPack.mu.Unlock()
+
+	logID, _ := h.store.StartSync("mystery_packs")
+	go func() {
+		apiKey, _ := h.store.GetConfig("ggdeals.api_key")
+
+		result, err := storesync.SyncMysteryPacks(h.store, apiKey, func(done, total int) {
+			h.mysteryPack.mu.Lock()
+			h.mysteryPack.done = done
+			h.mysteryPack.total = total
+			h.mysteryPack.mu.Unlock()
+		})
+
+		var msg string
+		if err != nil {
+			msg = "Mystery pack analysis failed: " + err.Error()
+		} else {
+			var errorSummary string
+			if len(result.Errors) > 0 {
+				errorSummary = fmt.Sprintf(" (%d errors)", len(result.Errors))
+				for _, e := range result.Errors {
+					log.Printf("mystery pack: %s", e)
+				}
+			}
+			msg = fmt.Sprintf("Mystery pack analysis complete — %d analyzed%s", result.Analyzed, errorSummary)
+		}
+		log.Printf("mystery pack sync done: %s", msg)
+
+		if logID > 0 {
+			syncStatus := "done"
+			errMsg := ""
+			if err != nil {
+				syncStatus = "failed"
+				errMsg = err.Error()
+			}
+			_ = h.store.FinishSync(logID, syncStatus, result.Analyzed, 0, errMsg)
+		}
+
+		h.mysteryPack.mu.Lock()
+		h.mysteryPack.running = false
+		h.mysteryPack.lastMsg = msg
+		h.mysteryPack.mu.Unlock()
+	}()
+
+	h.renderPartial(w, "sync_status_partial.html", syncStatusData{
+		Running: true,
+		Message: "Mystery pack analysis started…",
+		Detail:  "Fetching keyshop prices from GG.deals API",
+	})
 }

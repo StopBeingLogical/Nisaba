@@ -181,36 +181,85 @@
             </button>
         </div>
 
-        <!-- ── One-time import ───────────────────────────────── -->
+        <!-- ── Playnite Library Sync ─────────────────────────── -->
         <div class="sync-card">
-            <div class="sync-card-title">Import from Heroic</div>
+            <div class="sync-card-title">Playnite Library Sync</div>
             <p class="text-xs text-gray-500 mb-3">
-                One-shot import of Epic, GOG, and Amazon libraries from the
-                Heroic JSON files (<code class="text-amber-400">legendary_library.json</code>,
-                <code class="text-amber-400">gog_library.json</code>,
-                <code class="text-amber-400">nile_library.json</code>).
-                Sets enrichment status to
-                <span class="badge badge-needs-review">needs_review</span>
-                — run enrichment after to fetch metadata.
+                Sync your entire local library from Playnite (Windows) to Nisaba.
+                This replaces Heroic and GOG syncs, importing metadata, playtime, and ownership from all sources.
             </p>
 
-            <!-- Selected file list -->
-            <div id="heroic-file-list" class="text-xs text-gray-500 mb-3 hidden">
-                Selected: <span id="heroic-file-names" class="text-gray-300"></span>
+            <div class="bg-gray-950 rounded p-3 mb-3 border border-gray-800">
+                <div class="filter-heading mb-1 text-amber-500">Setup Instructions</div>
+                <ol class="text-xs text-gray-400 list-decimal ml-4 space-y-1">
+                    <li>Open <strong>Playnite</strong> on your Windows PC.</li>
+                    <li>Go to <strong>Main Menu > Extensions > Interactive SDK PowerShell</strong>.</li>
+                    <li>Copy and paste the script below into the window and press <strong>Enter</strong>.</li>
+                    <li><em>Optional:</em> Set a <code class="text-gray-300">sync.api_secret</code> in Nisaba Settings to secure this endpoint.</li>
+                </ol>
             </div>
 
-            <div class="flex items-center gap-2 flex-wrap">
-                <button onclick="heroicPickFiles()" id="heroic-pick-btn"
-                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                    Choose Files…
-                </button>
-                <button onclick="heroicUpload()" id="heroic-upload-btn" style="display:none"
-                    class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-gray-200 transition flex items-center gap-2">
-                    Import
-                    <span id="heroic-spinner" class="htmx-indicator text-amber-100">⟳</span>
-                </button>
-                <span id="heroic-status" class="text-xs text-gray-500"></span>
-            </div>
+            <textarea id="playnite-script" readonly class="w-full h-32 bg-gray-900 border border-gray-800 rounded p-2 text-[10px] font-mono text-gray-400 mb-2">
+# Nisaba Playnite Sync Script
+$NisabaUrl = "http://192.168.3.174:8090/api/sync/playnite"
+$ApiSecret = "" # Set this if you configured sync.api_secret in Nisaba settings
+$BatchSize = 50
+
+if ($null -eq $PlayniteApi) { $PlayniteApi = [Playnite.SDK.API]::Instance }
+$allGames = $PlayniteApi.Database.Games
+if ($null -eq $allGames) { Write-Error "Could not retrieve games database."; return }
+
+Write-Host "Total games to sync: $($allGames.Count)"
+
+for ($i = 0; $i -lt $allGames.Count; $i += $BatchSize) {
+    $batch = $allGames | Select-Object -Skip $i -First $BatchSize
+    $payload = @{ games = @() }
+    foreach ($g in $batch) {
+        if ($null -eq $g) { continue }
+        if ($g.Categories -and ($g.Categories | Where-Object { $_.Name -eq "Steam Family Sharing" })) { continue }
+        $source = if ($g.Source) { $g.Source.Name.ToLower() } else { "playnite" }
+        $lastPlayed = if ($g.LastActivity) { $g.LastActivity.ToString("yyyy-MM-ddTHH:mm:ssZ") } else { "" }
+        $releaseDate = ""
+        if ($g.ReleaseDate) {
+            $rd = $g.ReleaseDate; $mm = if ($rd.Month) { $rd.Month } else { 1 }; $dd = if ($rd.Day) { $rd.Day } else { 1 }
+            $releaseDate = "{0:D4}-{1:D2}-{2:D2}" -f $rd.Year, $mm, $dd
+        }
+        $platforms = if ($g.Platforms) { $g.Platforms | ForEach-Object { $_.Name.ToLower() } } else { @() }
+        $storeUrl = ""; if ($g.Links -and $g.Links.Count -gt 0) {
+            $storeUrl = ($g.Links | Where-Object { $_.Name -match "Store|Steam|GOG|Epic" } | Select-Object -First 1).Url
+            if (!$storeUrl) { $storeUrl = $g.Links[0].Url }
+        }
+        $desc = ""; if ($g.Description) {
+            $desc = [string]$g.Description; if ($desc.Length -gt 5000) { $desc = $desc.Substring(0, 5000) }
+            $desc = $desc -replace "`r", "" -replace "`n", " "
+        }
+        $payload.games += [PSCustomObject]@{
+            id = [string]$g.Id.ToString(); title = [string]$g.Name; source = [string]$source
+            store_id = [string]$g.GameId; store_url = [string]$storeUrl; play_time_minutes = [int]($g.Playtime / 60)
+            last_played = [string]$lastPlayed; release_date = [string]$releaseDate; description = $desc
+            windows = [bool]($platforms -contains "pc (windows)" -or $platforms -contains "windows")
+            mac = [bool]($platforms -contains "macos" -or $platforms -contains "mac")
+            linux = [bool]($platforms -contains "linux")
+            developer = if ($g.Developers) { [string]($g.Developers | Select-Object -First 1).Name } else { "" }
+            publisher = if ($g.Publishers) { [string]($g.Publishers | Select-Object -First 1).Name } else { "" }
+        }
+    }
+    $json = $payload | ConvertTo-Json -Depth 10 -Compress
+    Write-Host "Batch $($i / $BatchSize + 1): " -NoNewline
+    try {
+        $headers = @{ "Content-Type" = "application/json" }
+        if ($ApiSecret) { $headers.Add("X-Nisaba-Secret", $ApiSecret) }
+        $resp = Invoke-RestMethod -Uri $NisabaUrl -Method Post -Body $json -Headers $headers
+        Write-Host "OK (+ $($resp.added), ~ $($resp.updated))" -ForegroundColor Green
+    } catch {
+        Write-Host "FAILED" -ForegroundColor Red; Write-Error "Error: $_"; break
+    }
+}
+            </textarea>
+
+            <button onclick="copyPlayniteScript()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
+                Copy Script to Clipboard
+            </button>
         </div>
 
         <!-- ── Status panel (HTMX polling target) ────────────── -->
@@ -390,6 +439,16 @@
         } finally {
             btn.disabled = false;
         }
+    };
+
+    window.copyPlayniteScript = function() {
+        const area = document.getElementById('playnite-script');
+        area.select();
+        document.execCommand('copy');
+        const btn = event.target;
+        const oldText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = oldText, 2000);
     };
 
     // Parse a Steam ACF (KeyValues) file and return an install record or null.
