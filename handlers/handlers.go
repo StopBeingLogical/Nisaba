@@ -332,22 +332,42 @@ func priorityColor(priority int) string {
 	}
 }
 
-// storeShortLabel strips the source prefix from a store label.
-// "gg.deals/retail" → "Retail", "allkeyshop/Kinguin" → "Kinguin",
-// "instant-gaming" → "Instant Gaming", "loaded" → "Loaded".
+// storeShortLabel maps internal store keys to human-readable labels.
+// "gg.deals/retail" → "GG Retail", "allkeyshop/Kinguin" → "Kinguin",
+// "instant-gaming" → "Instant Gaming", "steam" → "Steam".
 func storeShortLabel(s string) string {
 	if i := strings.LastIndex(s, "/"); i >= 0 {
-		s = s[i+1:]
+		prefix := strings.ToLower(s[:i])
+		label := s[i+1:]
+		if prefix == "gg.deals" {
+			switch strings.ToLower(label) {
+			case "retail":
+				return "GG Retail"
+			case "keyshop", "keyshops":
+				return "GG Keyshops"
+			default:
+				return "GG.deals"
+			}
+		}
+		s = label
 	}
 	switch strings.ToLower(s) {
-	case "retail":
-		return "Retail stores"
-	case "keyshop", "keyshops":
-		return "Key resellers"
 	case "instant-gaming":
 		return "Instant Gaming"
 	case "loaded":
 		return "Loaded"
+	case "steam":
+		return "Steam"
+	case "gog":
+		return "GOG"
+	case "epic":
+		return "Epic"
+	case "amazon":
+		return "Amazon"
+	case "humble":
+		return "Humble"
+	case "fanatical":
+		return "Fanatical"
 	case "":
 		return "—"
 	default:
