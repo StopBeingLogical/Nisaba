@@ -286,6 +286,10 @@ func runMigrations(sqlDB *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_game_stores_game_id_owned ON game_stores(game_id, owned)`,
 		`CREATE INDEX IF NOT EXISTS idx_games_visible ON games(is_hidden, parent_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_games_igdb_id ON games(igdb_id)`,
+		`INSERT OR IGNORE INTO price_thresholds (id, label, max_price) VALUES (1, 'Instant Buy', 2.00)`,
+		`INSERT OR IGNORE INTO price_thresholds (id, label, max_price) VALUES (2, 'Consider', 5.00)`,
+		`INSERT OR IGNORE INTO price_thresholds (id, label, max_price) VALUES (3, 'Moderate', 10.00)`,
+		`INSERT OR IGNORE INTO price_thresholds (id, label, max_price) VALUES (4, 'Sale Watch', 20.00)`,
 	}
 	for _, stmt := range additive {
 		if _, err := sqlDB.Exec(stmt); err != nil {

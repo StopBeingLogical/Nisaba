@@ -46,7 +46,7 @@
             <div class="text-sm font-semibold {{ priceClass .BestCurrentPrice.Float64 0 }}">${{ printf "%.2f" .BestCurrentPrice.Float64 }}</div>
             <div class="text-xs text-gray-500 truncate">{{ storeShortLabel .BestCurrentStore.String }}</div>
             {{ if .HistoricalLowPrice.Valid }}
-            <div class="text-xs text-gray-600">Low ${{ printf "%.2f" .HistoricalLowPrice.Float64 }}</div>
+            <div class="text-xs text-gray-600">Low ${{ printf "%.2f" .HistoricalLowPrice.Float64 }} <span class="text-gray-700">{{ storeShortLabel .HistoricalLowStore.String }}</span></div>
             {{ end }}
             {{ else }}
             <div class="text-xs text-gray-600 italic">Not listed</div>
