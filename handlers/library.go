@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,8 +16,20 @@ import (
 	"nisaba/db"
 )
 
+const perPage = 200
+
+// gameGridData is passed to the grid partial so pagination controls can render.
+type gameGridData struct {
+	Games         []db.GameListRow
+	CurrentPage   int
+	TotalPages    int
+	TotalMatching int
+}
+
 // Library renders the main game library grid view.
 func (h *Handler) Library(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+
 	q := r.URL.Query()
 
 	p := db.ListGamesParams{
@@ -44,15 +57,33 @@ func (h *Handler) Library(w http.ResponseWriter, r *http.Request) {
 		p.Tags = tags
 	}
 
+	page := 1
+	if v := q.Get("page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			page = n
+		}
+	}
+	p.Limit = perPage
+	p.Offset = (page - 1) * perPage
+
+	total, _ := h.store.CountMatchingGames(p)
 	games, err := h.store.ListGames(p)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
 
-	// HTMX partial swap — only return the grid
+	totalPages := (total + perPage - 1) / perPage
+	gridData := gameGridData{
+		Games:         games,
+		CurrentPage:   page,
+		TotalPages:    totalPages,
+		TotalMatching: total,
+	}
+
+	// HTMX partial swap — only return the grid + pagination
 	if isHTMX(r) {
-		h.renderPartial(w, "game_grid_partial.html", games)
+		h.renderPartial(w, "game_grid_partial.html", gridData)
 		return
 	}
 
@@ -62,22 +93,31 @@ func (h *Handler) Library(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	total, _ := h.store.CountGames()
+	totalAll, _ := h.store.CountGames()
 	statuses, _ := h.store.StatusCounts()
 	stores, _ := h.store.StoreCounts()
 	genres, _ := h.store.TopGenres(15)
 	tags, _ := h.store.AllTags()
 	deckCounts, _ := h.store.SteamDeckCounts()
 
-	base["TotalGames"] = total
+	base["TotalGames"] = totalAll
 	base["StatusCounts"] = statuses
 	base["StoreCounts"] = stores
 	base["TopGenres"] = genres
 	base["Tags"] = tags
 	base["SteamDeckCounts"] = deckCounts
 	base["Games"] = games
+	base["Page"] = "library"
+	base["CurrentPage"] = page
+	base["TotalPages"] = totalPages
+	base["TotalMatching"] = total
 
 	h.render(w, "library.html", base)
+
+	elapsed := time.Since(start)
+	if elapsed > 100*time.Millisecond {
+		log.Printf("Library page loaded in %v (%d games, page %d/%d)", elapsed, total, page, totalPages)
+	}
 }
 
 // GameDetail renders the full detail page for a single game.

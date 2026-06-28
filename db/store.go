@@ -33,6 +33,8 @@ type ListGamesParams struct {
 	Installed  bool
 	Favorites  bool
 	Sort       string // "", "added", "playtime", "rating"
+	Limit      int    // 0 = no limit
+	Offset     int
 }
 
 func (s *Store) ListGames(p ListGamesParams) ([]GameListRow, error) {
@@ -94,8 +96,6 @@ func (s *Store) ListGames(p ListGamesParams) ([]GameListRow, error) {
 		orderBy = "CASE WHEN g.rating IS NULL THEN 1 ELSE 0 END, g.rating DESC, g.sort_title ASC"
 	}
 
-	args := append(joinArgs, whereArgs...)
-
 	q := fmt.Sprintf(`
 SELECT
     g.id, g.title, g.sort_title, g.enrichment_status,
@@ -113,6 +113,16 @@ SELECT
 FROM games g %s
 WHERE %s
 ORDER BY %s`, joins, strings.Join(where, " AND "), orderBy)
+
+	args := append(joinArgs, whereArgs...)
+	if p.Limit > 0 {
+		q += " LIMIT ?"
+		args = append(args, p.Limit)
+		if p.Offset > 0 {
+			q += " OFFSET ?"
+			args = append(args, p.Offset)
+		}
+	}
 
 	rows, err := s.db.Query(q, args...)
 	if err != nil {
@@ -314,6 +324,61 @@ ORDER BY g.sort_title`)
 func (s *Store) CountGames() (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM games WHERE is_hidden = 0 AND parent_id IS NULL`).Scan(&n)
+	return n, err
+}
+
+func (s *Store) CountMatchingGames(p ListGamesParams) (int, error) {
+	var whereArgs []any
+	where := []string{"g.is_hidden = 0", "g.parent_id IS NULL"}
+
+	if p.PlayStatus != nil && *p.PlayStatus != "" {
+		where = append(where, "g.play_status = ?")
+		whereArgs = append(whereArgs, *p.PlayStatus)
+	}
+	if p.SteamDeck != nil && *p.SteamDeck != "" {
+		where = append(where, "g.steam_deck_verified = ?")
+		whereArgs = append(whereArgs, *p.SteamDeck)
+	}
+	if p.Search != nil && *p.Search != "" {
+		where = append(where, "g.title LIKE ?")
+		whereArgs = append(whereArgs, "%"+*p.Search+"%")
+	}
+	switch p.Platform {
+	case "windows":
+		where = append(where, "g.windows = 1")
+	case "mac":
+		where = append(where, "g.mac = 1")
+	case "linux":
+		where = append(where, "g.linux = 1")
+	}
+	if p.Installed {
+		where = append(where, "g.is_installed = 1")
+	}
+	if p.Favorites {
+		where = append(where, "g.is_favorite = 1")
+	}
+
+	joins := ""
+	var joinArgs []any
+	if p.Store != nil && *p.Store != "" {
+		joins = "JOIN game_stores _sf ON _sf.game_id = g.id AND _sf.store = ? AND _sf.owned = 1"
+		joinArgs = append(joinArgs, *p.Store)
+	}
+	for i, genre := range p.Genres {
+		alias := fmt.Sprintf("_g%d", i)
+		joins += fmt.Sprintf(" JOIN game_genres %s ON %s.game_id = g.id AND %s.genre = ?", alias, alias, alias)
+		joinArgs = append(joinArgs, genre)
+	}
+	for i, tag := range p.Tags {
+		alias := fmt.Sprintf("_t%d", i)
+		joins += fmt.Sprintf(" JOIN game_tags %s ON %s.game_id = g.id AND %s.tag = ?", alias, alias, alias)
+		joinArgs = append(joinArgs, tag)
+	}
+
+	q := fmt.Sprintf("SELECT COUNT(*) FROM games g %s WHERE %s", joins, strings.Join(where, " AND "))
+	args := append(joinArgs, whereArgs...)
+	var n int
+	err := s.db.QueryRow(q, args...).Scan(&n)
 	return n, err
 }
 

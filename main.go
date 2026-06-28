@@ -285,6 +285,7 @@ func runMigrations(sqlDB *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_game_tags_game_id ON game_tags(game_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_game_stores_game_id_owned ON game_stores(game_id, owned)`,
 		`CREATE INDEX IF NOT EXISTS idx_games_visible ON games(is_hidden, parent_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_games_igdb_id ON games(igdb_id)`,
 	}
 	for _, stmt := range additive {
 		if _, err := sqlDB.Exec(stmt); err != nil {

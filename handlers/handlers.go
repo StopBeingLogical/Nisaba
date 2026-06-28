@@ -201,6 +201,8 @@ func TemplateFuncMap() template.FuncMap {
 		"storeShortLabel": storeShortLabel,
 		"seq":             seq,
 		"dict":            dict,
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
 		"ptrFloat": func(p *float64) float64 {
 			if p == nil {
 				return 0
