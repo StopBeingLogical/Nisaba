@@ -40,6 +40,22 @@ type syncAllState struct {
 	lastMsg string
 }
 
+// pageTemplates lists every template that defines a "content" block (full page).
+var pageTemplates = []string{
+	"dashboard.html",
+	"library.html",
+	"game_detail.html",
+	"game_add.html",
+	"wishlist.html",
+	"wishlist_detail.html",
+	"sync.html",
+	"settings.html",
+	"logs.html",
+	"review.html",
+	"mystery_packs.html",
+	"mystery_pack_detail.html",
+}
+
 // Handler holds shared dependencies for all HTTP handlers.
 type Handler struct {
 	store   *db.Store
@@ -48,6 +64,9 @@ type Handler struct {
 	// partials is a shared template set containing only the partial snippets
 	// (fragments that are never full-page renders and have no "content" block).
 	partials *template.Template
+	// templates caches pre-parsed full-page templates so render() avoids
+	// parsing from embed.FS on every request.
+	pageTmpls map[string]*template.Template
 	// igdb and rawg are lazily initialised on first enrichment run.
 	igdb       *storesync.IGDBClient
 	igdbMu     sync.Mutex
@@ -62,7 +81,7 @@ type Handler struct {
 // New creates a Handler. tmplFS is the embed.FS subtree for templates/.
 func New(store *db.Store, tmplFS fs.FS, funcMap template.FuncMap, dataDir string) *Handler {
 	// Pre-parse the partial templates (no base.html, no content block conflict).
-	partials := template.Must(
+	parsedPartials := template.Must(
 		template.New("").Funcs(funcMap).ParseFS(tmplFS,
 			"game_grid_partial.html",
 			"wishlist_grid_partial.html",
@@ -76,7 +95,25 @@ func New(store *db.Store, tmplFS fs.FS, funcMap template.FuncMap, dataDir string
 			"mystery_pack_games_section_partial.html",
 		),
 	)
-	return &Handler{store: store, tmplFS: tmplFS, funcMap: funcMap, partials: partials, dataDir: dataDir}
+
+	// Pre-parse every full-page template once and cache it. Each page has its
+	// own template instance to avoid the "content block conflict" (multiple
+	// {{ define "content" }}).
+	pageTmpls := make(map[string]*template.Template, len(pageTemplates))
+	for _, name := range pageTemplates {
+		files := append([]string{"base.html", name}, partials...)
+		t := template.Must(template.New("").Funcs(funcMap).ParseFS(tmplFS, files...))
+		pageTmpls[name] = t
+	}
+
+	return &Handler{
+		store:     store,
+		tmplFS:    tmplFS,
+		funcMap:   funcMap,
+		partials:  parsedPartials,
+		pageTmpls: pageTmpls,
+		dataDir:   dataDir,
+	}
 }
 
 // baseData returns the fields every page needs.
@@ -125,14 +162,11 @@ func (h *Handler) cleanupWishlistLinks() {
 	}
 }
 
-// render parses base.html + the named page template + all partials fresh per
-// request. Parsing only one page template at a time avoids the Go template
-// "content block conflict" (multiple {{ define "content" }} definitions).
+// render uses the pre-parsed page template cache.
 func (h *Handler) render(w http.ResponseWriter, name string, data any) {
-	files := append([]string{"base.html", name}, partials...)
-	t, err := template.New("").Funcs(h.funcMap).ParseFS(h.tmplFS, files...)
-	if err != nil {
-		log.Printf("render parse %s: %v", name, err)
+	t, ok := h.pageTmpls[name]
+	if !ok {
+		log.Printf("render: unknown template %q", name)
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}

@@ -281,6 +281,10 @@ func runMigrations(sqlDB *sql.DB) error {
 			url        TEXT,
 			recorded_at TEXT NOT NULL
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_game_genres_game_id ON game_genres(game_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_game_tags_game_id ON game_tags(game_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_game_stores_game_id_owned ON game_stores(game_id, owned)`,
+		`CREATE INDEX IF NOT EXISTS idx_games_visible ON games(is_hidden, parent_id)`,
 	}
 	for _, stmt := range additive {
 		if _, err := sqlDB.Exec(stmt); err != nil {
