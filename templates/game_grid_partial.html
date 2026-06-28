@@ -67,21 +67,49 @@
     </div>
 
     {{ if gt .TotalPages 1 }}
-    <div class="flex items-center justify-center gap-2 py-4">
+    <div class="flex items-center justify-center gap-1 py-4">
         {{ if gt .CurrentPage 1 }}
         <a href="?page={{ sub .CurrentPage 1 }}"
-           class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition"
+           class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition"
            hx-get="/library?page={{ sub .CurrentPage 1 }}"
            hx-target="#game-grid"
-           hx-include=".filter-input">Previous</a>
+           hx-include=".filter-input">‹</a>
         {{ end }}
-        <span class="text-sm text-gray-500">Page {{ .CurrentPage }} of {{ .TotalPages }} ({{ .TotalMatching }} games)</span>
+
+        {{ $cur := .CurrentPage }}
+        {{ $total := .TotalPages }}
+        {{ if gt .CurrentPage 4 }}
+        <a href="?page=1"
+           class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition"
+           hx-get="/library?page=1"
+           hx-target="#game-grid"
+           hx-include=".filter-input">1</a>
+        <span class="px-1 text-gray-600 text-sm">…</span>
+        {{ end }}
+
+        {{ range pages $cur $total }}
+        <a href="?page={{ . }}"
+           class="px-2.5 py-1.5 rounded-lg text-sm transition {{ if eq . $cur }}bg-amber-600 text-white{{ else }}bg-gray-800 hover:bg-gray-700{{ end }}"
+           hx-get="/library?page={{ . }}"
+           hx-target="#game-grid"
+           hx-include=".filter-input">{{ . }}</a>
+        {{ end }}
+
+        {{ if lt .CurrentPage (sub .TotalPages 3) }}
+        <span class="px-1 text-gray-600 text-sm">…</span>
+        <a href="?page={{ .TotalPages }}"
+           class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition"
+           hx-get="/library?page={{ .TotalPages }}"
+           hx-target="#game-grid"
+           hx-include=".filter-input">{{ .TotalPages }}</a>
+        {{ end }}
+
         {{ if lt .CurrentPage .TotalPages }}
         <a href="?page={{ add .CurrentPage 1 }}"
-           class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition"
+           class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition"
            hx-get="/library?page={{ add .CurrentPage 1 }}"
            hx-target="#game-grid"
-           hx-include=".filter-input">Next</a>
+           hx-include=".filter-input">›</a>
         {{ end }}
     </div>
     {{ end }}

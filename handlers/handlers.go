@@ -203,6 +203,22 @@ func TemplateFuncMap() template.FuncMap {
 		"dict":            dict,
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
+		"pages": func(current, total int) []int {
+			const window = 3
+			start := current - window
+			if start < 1 {
+				start = 1
+			}
+			end := current + window
+			if end > total {
+				end = total
+			}
+			out := make([]int, 0, end-start+1)
+			for i := start; i <= end; i++ {
+				out = append(out, i)
+			}
+			return out
+		},
 		"ptrFloat": func(p *float64) float64 {
 			if p == nil {
 				return 0

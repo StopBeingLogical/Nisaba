@@ -998,6 +998,34 @@ WHERE wishlist_id = ? ORDER BY recorded_at ASC LIMIT 90`, id)
 	return result, rows.Err()
 }
 
+// LowestPrices returns the 3 cheapest prices for a wishlist entry, one per store.
+func (s *Store) LowestPrices(id string) ([]PriceHistoryRow, error) {
+	rows, err := s.db.Query(`
+SELECT price, store, recorded_at FROM (
+    SELECT price, store, recorded_at,
+           ROW_NUMBER() OVER (PARTITION BY store ORDER BY price ASC) AS rn
+    FROM wishlist_price_history
+    WHERE wishlist_id = ? AND price IS NOT NULL
+) WHERE rn = 1
+ORDER BY price ASC
+LIMIT 3`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []PriceHistoryRow
+	for rows.Next() {
+		var r PriceHistoryRow
+		var recAt string
+		if err := rows.Scan(&r.Price, &r.Store, &recAt); err != nil {
+			return nil, err
+		}
+		r.RecordedAt, _ = time.Parse("2006-01-02 15:04:05", recAt)
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
 // GetWishlistDetail fetches a single wishlist entry with all fields for the detail view.
 func (s *Store) GetWishlistDetail(id string) (*WishlistDetailRow, error) {
 	var r WishlistDetailRow

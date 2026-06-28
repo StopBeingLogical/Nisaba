@@ -95,6 +95,10 @@
                     </span>
                     <span class="text-xs text-gray-500">{{ storeShortLabel .Entry.BestCurrentStore.String }}</span>
                 </div>
+                {{ if .Entry.BestPriceURL.Valid }}
+                <a href="{{ .Entry.BestPriceURL.String }}" target="_blank" rel="noopener"
+                   class="text-xs text-amber-500 hover:text-amber-400 -mt-2 mb-2 inline-block">View deal ↗</a>
+                {{ end }}
                 {{ if .Entry.HistoricalLowPrice.Valid }}
                 <div class="flex items-center justify-between text-xs text-gray-500 border-t border-gray-800 pt-2">
                     <span>Historical low</span>
@@ -114,6 +118,23 @@
                 <p class="text-xs text-gray-500 italic">No pricing data — may be unreleased or delisted</p>
                 {{ end }}
             </div>
+
+            <!-- Best prices from known stores -->
+            {{ if .LowestPrices }}
+            <div class="sync-card">
+                <div class="sync-card-title">Best Prices</div>
+                <div class="flex flex-col gap-1.5">
+                    {{ range $i, $p := .LowestPrices }}
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-xs text-gray-500 w-16">{{ storeShortLabel $p.Store }}</span>
+                        <span class="font-semibold {{ if eq $i 0 }}text-green-400{{ else }}text-gray-300{{ end }}">
+                            ${{ printf "%.2f" $p.Price }}
+                        </span>
+                    </div>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
 
             <!-- Store availability -->
             {{ if .Stores }}

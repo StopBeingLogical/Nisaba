@@ -103,6 +103,7 @@ func (h *Handler) WishlistDetail(w http.ResponseWriter, r *http.Request) {
 
 	stores, _ := h.store.ListWishlistStores(id)
 	history, _ := h.store.ListWishlistPriceHistory(id)
+	lowestPrices, _ := h.store.LowestPrices(id)
 
 	base, err := h.baseData("wishlist")
 	if err != nil {
@@ -113,6 +114,7 @@ func (h *Handler) WishlistDetail(w http.ResponseWriter, r *http.Request) {
 	base["Entry"] = entry
 	base["Stores"] = stores
 	base["PriceHistory"] = history
+	base["LowestPrices"] = lowestPrices
 
 	h.render(w, "wishlist_detail.html", base)
 }
