@@ -16,9 +16,16 @@ For detailed changes, see subdirectory changelogs:
 - **Mystery Pack Scraper Integration** — 3-stage stateful API (Queue, Review, Apply) for importing game packs from keyshops.
 - **Chrome Extension** — Manifest V3 scraper for G2A (and others) with batch collection and interactive diff review dashboard.
 - **Dynamic Price Tracking** — Automated tracking of multi-seller offers and historical price snapshots for mystery packs.
+- **Template Caching** — All page templates pre-parsed at startup, eliminating ~200-500ms per request re-parsing overhead.
+- **Performance Indexes & Pagination** — Added indexes for game_genres, game_tags, game_stores, and games tables; library grid paginated at 200 games/page with numbered page selector.
+- **Wishlist Autoclean Pipeline** — Unified three-step pipeline (link by IGDB ID → link by store ID → delete linked entries) replacing individual per-sync cleanup calls.
+- **Sync Page Simplification** — Removed individual sync routes; only Full Sync, Install State, and Playnite Library Sync remain.
+- **Price Threshold System** — Seeded 4 default thresholds (Instant Buy $2, Consider $5, Moderate $10, Sale Watch $20) enabling max_price sidebar filter.
+- **3 Lowest Prices** — Window-function query returns top-3 cheapest store prices per wishlist entry, displayed as "Best Prices" card with "View deal ↗" link.
 
 ### Changed
 - Refactored `sync_log` type checking to support mystery pack sync events.
+- `storeShortLabel` now maps `gg.deals/retail` → "GG Retail" and `gg.deals/keyshop` → "GG Keyshops" with explicit names for Steam, GOG, Epic, Amazon, Humble, Fanatical.
 
 ---
 

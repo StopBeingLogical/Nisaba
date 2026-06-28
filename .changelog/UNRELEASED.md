@@ -12,6 +12,11 @@
 - Added Playnite-to-Nisaba automated library sync via PowerShell (2026-04-26)
 - Added support for dynamic storefronts (Xbox, Itch, Battle.net, etc.) via database migration
 - Added Chrome extension scrape API for mystery pack integration (2026-04-24)
+- Added template caching, performance indexes, library pagination (2026-06-28)
+- Added wishlist autoclean pipeline (link by IGDB → link by store → delete linked) (2026-06-28)
+- Simplified sync page to core cards only (2026-06-28)
+- Added price threshold system with 4 seeded defaults (2026-06-28)
+- Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
 - Added FindGameByTitle() and makeSortTitle() for robust deduplication (2026-04-27)
@@ -21,6 +26,11 @@
 - Added mystery_pack_price_history table for price snapshots
 - Added 12 new store methods for queue, offer, and price history management
 - Added ListWishlistTitleIndex() for game title matching
+- Added LinkWishlistToLibraryByStore() and DeleteLinkedWishlistEntries() for autoclean (2026-06-28)
+- Added CountMatchingGames() for pagination count queries (2026-06-28)
+- Added LowestPrices() using window function for top-3 store prices (2026-06-28)
+- Added migration: game_genres(game_id), game_tags(game_id), game_stores(game_id, owned), games(is_hidden, parent_id), games(igdb_id) indexes (2026-06-28)
+- Added migration: price_thresholds table with 4 seeded default rows (2026-06-28)
 
 ## handlers/ Changes
 - Added POST /api/sync/playnite for automated library updates (2026-04-26)
@@ -30,6 +40,13 @@
 - Added POST /api/mystery-packs/scrape/queue for data ingestion with validation
 - Added GET /api/mystery-packs/scrape/review for diff computation
 - Added POST /api/mystery-packs/scrape/apply for user-approved changes
+- Added template caching — pre-parse all page templates at startup (2026-06-28)
+- Added cleanupWishlistLinks() helper used by all sync handlers (2026-06-28)
+- Simplified sync page — removed individual sync routes, kept 4 core cards (2026-06-28)
+- Added library pagination with page selector (200 games/page) (2026-06-28)
+- Added timing logging to library handler (>100ms threshold) (2026-06-28)
+- Added storeShortLabel template func with improved store name mapping (2026-06-28)
+- Added 3 lowest prices display to wishlist detail page (2026-06-28)
 
 ## sync/ Changes
 - Added standalone sync_playnite.ps1 PowerShell script for Playnite SDK (2026-04-26)

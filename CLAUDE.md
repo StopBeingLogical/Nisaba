@@ -147,3 +147,43 @@ All external images are served through `/img/proxy?url=...` to bypass corporate 
 **Format:** One-liner per bullet. Include date if notable: `- Added X feature (2026-04-23)`
 
 **Top-level CHANGELOG.md records:** Major features, significant API integrations, deployment changes only. Detail goes in subdirectory files.
+
+---
+
+## Recent Session Context (2026-06-28)
+
+### What was done
+- **Wishlist autoclean:** `LinkWishlistToLibraryByStore()` and `DeleteLinkedWishlistEntries()` in db/store.go. `cleanupWishlistLinks()` helper in handlers/handlers.go. Replaces individual `LinkWishlistToLibrary()` calls in sync handlers.
+- **Sync page cleanup:** Removed individual sync routes (Heroic, Steam, Wishlist, IGDB, etc.). Only 4 cards remain: Full Sync, Install State, Playnite Library Sync, plus Status/Recent Activity. Simplified handlers/sync.go, updated main.go routes.
+- **Template caching:** All 12 page templates pre-parsed at startup in `New()`, stored in `pageTmpls` map. `render()` uses cached template — avoids re-parsing from embed.FS per request.
+- **Performance indexes:** `game_genres(game_id)`, `game_tags(game_id)`, `game_stores(game_id, owned)`, composite `games(is_hidden, parent_id)`, `games(igdb_id)` via migrations.
+- **Library pagination:** 200 games/page. `CountMatchingGames()` query. `gameGridData` struct. Numbered page selector with `pages()` template func.
+- **Timing log:** Library handler logs elapsed time when >100ms.
+- **Price thresholds:** Seeded 4 default rows (Instant Buy $2, Consider $5, Moderate $10, Sale Watch $20). Enables max_price radio filter on wishlist sidebar.
+- **3 lowest prices:** `LowestPrices()` (window function, cheapest 3 per game). Displayed as "Best Prices" card on wishlist_detail.html. "View deal ↗" link using `best_price_url`.
+- **StoreShortLabel improved:** Mapped `gg.deals/retail` → "GG Retail", `gg.deals/keyshop` → "GG Keyshops". Added explicit mappings for Steam, GOG, Epic, Amazon, Humble, Fanatical.
+
+### Blockers / Known Issues
+- **GG.deals store names are category-level only** — API returns `gg.deals/retail` or `gg.deals/keyshop`, never individual store names. The `best_current_store` and `wishlist_price_history.store` values are always these categories. Fix options: (a) switch to ITAD sync (provides real store names via `p.Current.Shop.Name`), (b) different GG.deals endpoint, (c) scrape GG.deals URL page.
+
+### Working context
+- Live DB stats: 3675 games, 558 wishlist entries, 15566 price history entries (403 of 558 have prices).
+- Only GG.deals API configured (no ITAD).
+- Repo on Forgejo at `ssh://git@192.168.3.174:2222/bobby/nisaba.git` (pushed this session).
+- GitHub mirror at `https://github.com/StopBeingLogical/Nisaba.git`.
+- Build: `go build ./...` and `go vet ./...` pass clean.
+- Deploy path: `/mnt/MemoryAlpha/nisaba/source/` on TrueNAS, deployed via `deploy.sh`.
+- Local clone now at `~/code/nisaba` (was at `~/nextcloud/Mneme/code/nisaba/`).
+
+### Relevant files
+- `db/store.go` — ListGames (LIMIT/OFFSET), CountMatchingGames, LowestPrices, LinkWishlistToLibraryByStore, DeleteLinkedWishlistEntries
+- `handlers/handlers.go` — Handler struct, template funcs (add, sub, pages, storeShortLabel), template caching (pageTmpls), render() uses cached
+- `handlers/sync.go` — Simplified to core sync handlers only
+- `handlers/library.go` — Pagination (200/page), timing log
+- `handlers/wishlist.go` — Detail handler loads LowestPrices
+- `main.go` — Chi routes, runMigrations (all index + threshold seed migrations)
+- `templates/game_grid_partial.html` — Numbered page selector with pages()
+- `templates/wishlist_detail.html` — Pricing card, Best Prices card
+- `templates/wishlist_grid_partial.html`, `wishlist_cards_partial.html` — Store names on price displays
+- `sync/ggdeals.go` — GG.deals API, category-level store names only
+- `sync/itad.go` — ITAD sync (not configured, but would provide real store names)

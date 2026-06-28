@@ -6,8 +6,17 @@ HTTP handlers and user-facing features.
 
 ## [Unreleased]
 
-### Status
-- No pending changes
+### Added (2026-06-28)
+- Template caching: pre-parse all 12 page templates at startup in `New()`, stored in `pageTmpls` map
+- `cleanupWishlistLinks()` helper — unified wishlist autoclean pipeline (link by IGDB → link by store → delete linked)
+- Library pagination with numbered page selector (200 games/page)
+- Timing logging in library handler (>100ms threshold)
+- `storeShortLabel` template func — improved real store names for Steam, GOG, Epic, Amazon, Humble, Fanatical
+- 3 lowest prices display on wishlist detail page with "View deal ↗" link
+
+### Changed (2026-06-28)
+- Sync page simplified: removed individual sync routes, only Full Sync, Install State, Playnite cards remain
+- `render()` now uses cached templates instead of re-parsing from embed.FS on every request
 
 ---
 

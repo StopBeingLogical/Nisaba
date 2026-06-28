@@ -6,8 +6,14 @@ Schema changes, migrations, and data model updates.
 
 ## [Unreleased]
 
-### Status
-- No pending changes
+### Added (2026-06-28)
+- `LinkWishlistToLibraryByStore()` and `DeleteLinkedWishlistEntries()` — wishlist autoclean pipeline
+- `CountMatchingGames()` — pagination count query with same filters as ListGames
+- `LowestPrices()` — window function query returning 3 cheapest prices per wishlist entry
+- Migration: `game_genres(game_id)`, `game_tags(game_id)`, `game_stores(game_id, owned)` indexes
+- Migration: composite `games(is_hidden, parent_id)` index
+- Migration: `games(igdb_id)` index
+- Migration: `price_thresholds` table with 4 seeded defaults (Instant Buy, Consider, Moderate, Sale Watch)
 
 ---
 
