@@ -1018,6 +1018,46 @@ WHERE igdb_id IS NOT NULL
 	return int(n), nil
 }
 
+// LinkWishlistToLibraryByStore sets library_id on wishlist entries whose
+// wishlist_stores (store + store_id) match an owned game_stores row.
+// This catches matches that IGDB ID linking misses (e.g. Steam games without
+// IGDB enrichment). Idempotent — safe to call repeatedly.
+func (s *Store) LinkWishlistToLibraryByStore() (int, error) {
+	res, err := s.db.Exec(`
+UPDATE wishlist_entries
+SET library_id = (
+    SELECT gs.game_id FROM game_stores gs
+    JOIN wishlist_stores ws ON ws.wishlist_id = wishlist_entries.id
+    WHERE gs.store = ws.store AND gs.store_id = ws.store_id AND gs.owned = 1
+    LIMIT 1
+)
+WHERE library_id IS NULL
+  AND EXISTS (
+    SELECT 1 FROM wishlist_stores ws
+    JOIN game_stores gs ON gs.store = ws.store AND gs.store_id = ws.store_id AND gs.owned = 1
+    WHERE ws.wishlist_id = wishlist_entries.id
+  )`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// DeleteLinkedWishlistEntries removes wishlist entries that have been linked
+// to a library game (library_id IS NOT NULL). Only deletes entries not flagged
+// for manual review (flag_remove = 0). Returns the number deleted.
+func (s *Store) DeleteLinkedWishlistEntries() (int, error) {
+	res, err := s.db.Exec(`
+DELETE FROM wishlist_entries
+WHERE library_id IS NOT NULL AND flag_remove = 0`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
 // GameTitlesByStoreID returns a map of store_id → game title for a given store.
 // Used to resolve names for wishlist items already in the library.
 func (s *Store) GameTitlesByStoreID(storeName string, storeIDs []string) (map[string]string, error) {

@@ -23,22 +23,12 @@ type enrichState struct {
 	lastMsg string
 }
 
-// pricingState tracks a running ITAD pricing sync job.
-type pricingState struct {
-	mu         sync.Mutex
-	running    bool
-	step       string // current step label
-	stepDone   int
-	stepTotal  int
-	stepPct    int // 0-100
-	lastMsg    string
-	lastErrors []string
-}
-
-// wishlistState tracks a running wishlist sync job.
-type wishlistState struct {
+// mysteryPackState tracks a running mystery pack analysis.
+type mysteryPackState struct {
 	mu      sync.Mutex
 	running bool
+	done    int
+	total   int
 	lastMsg string
 }
 
@@ -47,24 +37,6 @@ type syncAllState struct {
 	mu      sync.Mutex
 	running bool
 	step    string
-	lastMsg string
-}
-
-// simpleJobState tracks a single-step background job (deck status, proton).
-type simpleJobState struct {
-	mu      sync.Mutex
-	running bool
-	done    int
-	total   int
-	lastMsg string
-}
-
-// mysteryPackState tracks a running mystery pack sync job.
-type mysteryPackState struct {
-	mu      sync.Mutex
-	running bool
-	done    int
-	total   int
 	lastMsg string
 }
 
@@ -77,17 +49,12 @@ type Handler struct {
 	// (fragments that are never full-page renders and have no "content" block).
 	partials *template.Template
 	// igdb and rawg are lazily initialised on first enrichment run.
-	igdb        *storesync.IGDBClient
-	igdbMu      sync.Mutex
-	rawg        *storesync.RAWGClient
-	rawgMu      sync.Mutex
+	igdb       *storesync.IGDBClient
+	igdbMu     sync.Mutex
+	rawg       *storesync.RAWGClient
+	rawgMu     sync.Mutex
 	enrichment  enrichState
-	pricing     pricingState
-	wishlist    wishlistState
 	syncAll     syncAllState
-	deck        simpleJobState
-	proton      simpleJobState
-	crossref    simpleJobState
 	mysteryPack mysteryPackState
 	dataDir     string
 }
@@ -137,6 +104,25 @@ var partials = []string{
 	"mystery_pack_analysis_partial.html",
 	"mystery_pack_game_add_partial.html",
 	"mystery_pack_games_section_partial.html",
+}
+
+// cleanupWishlistLinks runs the full wishlist cleanup pipeline after a sync:
+// 1. Link wishlist entries to library by IGDB ID
+// 2. Link by store ID (for entries without IGDB enrichment)
+// 3. Delete linked entries (skipping those manually flagged for review)
+func (h *Handler) cleanupWishlistLinks() {
+	linked, _ := h.store.LinkWishlistToLibrary()
+	if linked > 0 {
+		log.Printf("sync: linked %d wishlist entries to library (by IGDB ID)", linked)
+	}
+	storeLinked, _ := h.store.LinkWishlistToLibraryByStore()
+	if storeLinked > 0 {
+		log.Printf("sync: linked %d wishlist entries to library (by store ID)", storeLinked)
+	}
+	deleted, _ := h.store.DeleteLinkedWishlistEntries()
+	if deleted > 0 {
+		log.Printf("sync: cleaned up %d wishlist entries that are now owned", deleted)
+	}
 }
 
 // render parses base.html + the named page template + all partials fresh per

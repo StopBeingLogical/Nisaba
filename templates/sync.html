@@ -14,8 +14,9 @@
         <div class="sync-card">
             <div class="sync-card-title">Full Sync</div>
             <p class="text-sm text-gray-400 mb-4">
-                Sync ownership from all storefronts, read install state from this device,
-                refresh pricing, then run enrichment on any new games.
+                Sync ownership from Steam, GOG, Epic, and Amazon via Playnite.
+                Refresh Steam and GOG wishlists, fetch pricing, run IGDB enrichment,
+                and update Steam Deck compatibility — everything in one shot.
             </p>
             <button
                 hx-post="/sync/all"
@@ -26,159 +27,38 @@
             </button>
         </div>
 
-        <!-- ── Wishlist Refresh ──────────────────────────────── -->
+        <!-- ── Install State ─────────────────────────────────── -->
         <div class="sync-card">
-            <div class="sync-card-title">Wishlist Refresh</div>
-            <p class="text-sm text-gray-400 mb-4">
-                Refresh wishlists from Steam and GOG, update Steam Deck compatibility and ProtonDB
-                ratings for any new entries, refresh pricing, then run IGDB enrichment on
-                unmatched wishlist items.
-            </p>
-            <button
-                hx-post="/sync/wishlist-refresh"
-                hx-target="#sync-status"
-                hx-swap="outerHTML"
-                class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
-                Refresh Wishlist
-            </button>
-        </div>
-
-        <!-- ── Individual sync cards ─────────────────────────── -->
-        <div class="grid grid-cols-2 gap-4">
-
-            <div class="sync-card">
-                <div class="sync-card-title">Ownership</div>
-                <p class="text-xs text-gray-500 mb-3">Fetch owned games from Steam, GOG, Epic, Amazon APIs.</p>
-                <div class="text-xs text-gray-600 mb-3">Last: {{ if .LastOwnershipSync }}{{ .LastOwnershipSync }}{{ else }}Never{{ end }}</div>
-                <button hx-post="/sync/ownership" hx-target="#sync-status" hx-swap="outerHTML"
-                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                    Sync Ownership
-                </button>
-            </div>
-
-            <div class="sync-card">
-                <div class="sync-card-title">Install State</div>
-                <p class="text-xs text-gray-500 mb-3">
-                    Reads Steam <code class="text-amber-400">appmanifest_*.acf</code> files directly from your browser.
-                    Select your <code class="text-gray-300">steamapps</code> folder — you can add multiple before syncing.
-                </p>
-
-                <!-- Device name -->
-                <div class="mb-3">
-                    <div class="filter-heading">This device</div>
-                    <input type="text" id="install-device-name" placeholder="e.g. Praxis"
-                        class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-amber-500 w-44" />
-                </div>
-
-                <!-- Scanned folders summary (hidden until first scan) -->
-                <div id="install-folders" class="text-xs text-gray-500 mb-2 hidden">
-                    Scanned: <span id="install-folder-list" class="text-gray-400"></span>
-                    &middot; <span id="install-game-count" class="text-amber-400">0</span> games found
-                </div>
-
-                <!-- Action buttons -->
-                <div class="flex items-center gap-2 flex-wrap">
-                    <button onclick="addSteamFolder()" id="install-add-btn"
-                        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                        Scan Steam Folder
-                    </button>
-                    <button onclick="syncInstallToServer()" id="install-sync-btn" style="display:none"
-                        class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-gray-200 transition">
-                        Sync to Server
-                    </button>
-                    <span id="install-status" class="text-xs text-gray-500"></span>
-                </div>
-
-                <div class="text-xs text-gray-700 mt-3">Last: {{ if .LastInstallSync }}{{ .LastInstallSync }}{{ else }}Never{{ end }}</div>
-            </div>
-
-            <div class="sync-card">
-                <div class="sync-card-title">Pricing</div>
-                <p class="text-xs text-gray-500 mb-3">Refresh wishlist prices via ITAD and resellers.</p>
-                <div class="text-xs text-gray-600 mb-3">Last: {{ if .LastPricingSync }}{{ .LastPricingSync }}{{ else }}Never{{ end }}</div>
-                <button hx-post="/sync/pricing" hx-target="#sync-status" hx-swap="outerHTML"
-                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                    Sync Pricing
-                </button>
-            </div>
-
-            <div class="sync-card">
-                <div class="sync-card-title">Steam Cross-References</div>
-                <p class="text-xs text-gray-500 mb-3">Map non-Steam library games (GOG, Epic, Amazon) to their Steam equivalents via IGDB. Run this before Deck Status to enable compatibility checks for those games.</p>
-                <button hx-post="/sync/steam-crossref" hx-target="#sync-status" hx-swap="outerHTML"
-                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                    Sync Steam Cross-References
-                </button>
-            </div>
-
-            <div class="sync-card">
-                <div class="sync-card-title">Steam Deck Status</div>
-                <p class="text-xs text-gray-500 mb-3">Fetch Steam Deck compatibility ratings for Steam games and wishlist entries missing a status. Includes cross-referenced non-Steam games.</p>
-                <button hx-post="/sync/deck" hx-target="#sync-status" hx-swap="outerHTML"
-                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                    Sync Deck Status
-                </button>
-            </div>
-
-            <div class="sync-card">
-                <div class="sync-card-title">ProtonDB Ratings</div>
-                <p class="text-xs text-gray-500 mb-3">Fetch community Proton compatibility ratings for Steam-owned games without a stored rating.</p>
-                <button hx-post="/sync/proton" hx-target="#sync-status" hx-swap="outerHTML"
-                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                    Sync ProtonDB
-                </button>
-            </div>
-
-            <div class="sync-card">
-                <div class="sync-card-title">Wishlist</div>
-                <p class="text-xs text-gray-500 mb-3">Import wishlists from Steam and GOG.</p>
-                <div class="text-xs text-gray-600 mb-3">Last: {{ if .LastWishlistSync }}{{ .LastWishlistSync }}{{ else }}Never{{ end }}</div>
-                <div class="flex gap-2 flex-wrap">
-                    <button hx-post="/sync/wishlist" hx-target="#sync-status" hx-swap="outerHTML"
-                        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                        Sync Steam Wishlist
-                    </button>
-                    <button hx-post="/sync/wishlist/gog" hx-target="#sync-status" hx-swap="outerHTML"
-                        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
-                        Sync GOG Wishlist
-                    </button>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- ── IGDB enrichment ───────────────────────────────── -->
-        <div class="sync-card">
-            <div class="sync-card-title">IGDB Enrichment</div>
+            <div class="sync-card-title">Install State</div>
             <p class="text-xs text-gray-500 mb-3">
-                Search IGDB for every unmatched game and auto-match on exact title.
-                Fetches covers, descriptions, genres, and release dates.
-                Runs at ~4 req/sec — expect ~8 min for 2 000 games.
+                Reads Steam <code class="text-amber-400">appmanifest_*.acf</code> files directly from your browser.
+                Select your <code class="text-gray-300">steamapps</code> folder — you can add multiple before syncing.
             </p>
-            <div class="text-xs text-gray-600 mb-3">Unmatched: {{ .NeedsReview }}</div>
-            <button
-                hx-post="/sync/enrich"
-                hx-target="#sync-status"
-                hx-swap="outerHTML"
-                class="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 rounded-lg text-sm text-gray-200 transition">
-                Run IGDB Enrichment
-            </button>
-        </div>
 
-        <!-- ── Wishlist enrichment ───────────────────────────── ---->
-        <div class="sync-card">
-            <div class="sync-card-title">Wishlist IGDB Enrichment</div>
-            <p class="text-xs text-gray-500 mb-3">
-                Search IGDB for every unmatched wishlist entry and fetch covers,
-                descriptions, and release dates.
-            </p>
-            <button
-                hx-post="/sync/enrich-wishlist"
-                hx-target="#sync-status"
-                hx-swap="outerHTML"
-                class="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 rounded-lg text-sm text-gray-200 transition">
-                Run Wishlist Enrichment
-            </button>
+            <div class="mb-3">
+                <div class="filter-heading">This device</div>
+                <input type="text" id="install-device-name" placeholder="e.g. Praxis"
+                    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-amber-500 w-44" />
+            </div>
+
+            <div id="install-folders" class="text-xs text-gray-500 mb-2 hidden">
+                Scanned: <span id="install-folder-list" class="text-gray-400"></span>
+                &middot; <span id="install-game-count" class="text-amber-400">0</span> games found
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="addSteamFolder()" id="install-add-btn"
+                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-200 transition">
+                    Scan Steam Folder
+                </button>
+                <button onclick="syncInstallToServer()" id="install-sync-btn" style="display:none"
+                    class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-gray-200 transition">
+                    Sync to Server
+                </button>
+                <span id="install-status" class="text-xs text-gray-500"></span>
+            </div>
+
+            <div class="text-xs text-gray-700 mt-3">Last: {{ if .LastInstallSync }}{{ .LastInstallSync }}{{ else }}Never{{ end }}</div>
         </div>
 
         <!-- ── Playnite Library Sync ─────────────────────────── -->
@@ -294,11 +174,10 @@ for ($i = 0; $i -lt $allGames.Count; $i += $BatchSize) {
 
 <script>
 (function () {
-    // Restore saved device name from localStorage.
     const saved = localStorage.getItem('nisaba-device');
     if (saved) document.getElementById('install-device-name').value = saved;
 
-    const scannedGames = {};   // keyed by store_id — deduplicates across folders
+    const scannedGames = {};
     const scannedFolders = [];
 
     function setStatus(msg) {
@@ -377,70 +256,6 @@ for ($i = 0; $i -lt $allGames.Count; $i += $BatchSize) {
         }
     };
 
-    // ── Heroic file picker ────────────────────────────────────────────────────
-
-    const heroicAccepted = new Set(['legendary_library.json', 'gog_library.json', 'nile_library.json']);
-    let heroicFiles = [];
-
-    window.heroicPickFiles = async function () {
-        if (!window.showOpenFilePicker) {
-            // Fallback to plain <input type="file"> for non-Chrome browsers.
-            const inp = document.createElement('input');
-            inp.type = 'file';
-            inp.multiple = true;
-            inp.accept = '.json,application/json';
-            inp.onchange = () => heroicSetFiles(Array.from(inp.files));
-            inp.click();
-            return;
-        }
-        try {
-            const handles = await window.showOpenFilePicker({
-                multiple: true,
-                types: [{ description: 'JSON files', accept: { 'application/json': ['.json'] } }],
-            });
-            const files = await Promise.all(handles.map(h => h.getFile()));
-            heroicSetFiles(files);
-        } catch (err) {
-            if (err.name !== 'AbortError') document.getElementById('heroic-status').textContent = 'Error: ' + err.message;
-        }
-    };
-
-    function heroicSetFiles(files) {
-        heroicFiles = files.filter(f => heroicAccepted.has(f.name));
-        const names = heroicFiles.map(f => f.name).join(', ');
-        if (heroicFiles.length === 0) {
-            document.getElementById('heroic-status').textContent = 'No recognised library files selected.';
-            document.getElementById('heroic-upload-btn').style.display = 'none';
-            document.getElementById('heroic-file-list').classList.add('hidden');
-            return;
-        }
-        document.getElementById('heroic-file-names').textContent = names;
-        document.getElementById('heroic-file-list').classList.remove('hidden');
-        document.getElementById('heroic-upload-btn').style.display = '';
-        document.getElementById('heroic-status').textContent = '';
-    }
-
-    window.heroicUpload = async function () {
-        if (heroicFiles.length === 0) return;
-        const btn = document.getElementById('heroic-upload-btn');
-        btn.disabled = true;
-        document.getElementById('heroic-status').textContent = 'Uploading…';
-        const form = new FormData();
-        for (const f of heroicFiles) form.append('files', f, f.name);
-        try {
-            const resp = await fetch('/sync/import/heroic/upload', { method: 'POST', body: form });
-            const html = await resp.text();
-            // Replace the sync-status panel just like HTMX would.
-            const target = document.getElementById('sync-status');
-            if (target) target.outerHTML = html;
-            document.getElementById('heroic-status').textContent = '';
-        } catch (err) {
-            document.getElementById('heroic-status').textContent = 'Error: ' + err.message;
-        } finally {
-            btn.disabled = false;
-        }
-    };
-
     window.copyPlayniteScript = function() {
         const area = document.getElementById('playnite-script');
         area.select();
@@ -451,12 +266,11 @@ for ($i = 0; $i -lt $allGames.Count; $i += $BatchSize) {
         setTimeout(() => btn.textContent = oldText, 2000);
     };
 
-    // Parse a Steam ACF (KeyValues) file and return an install record or null.
     function parseAcf(text) {
         const appid = (text.match(/"appid"\s+"(\d+)"/) || [])[1];
         if (!appid) return null;
         const stateFlags = parseInt((text.match(/"StateFlags"\s+"(\d+)"/) || [])[1] || '0');
-        if ((stateFlags & 4) === 0) return null;   // bit 2 = fully installed
+        if ((stateFlags & 4) === 0) return null;
         return {
             store:       'steam',
             store_id:    appid,

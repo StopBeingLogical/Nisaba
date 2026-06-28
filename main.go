@@ -139,19 +139,7 @@ func main() {
 		// Sync
 		r.Get("/sync", h.SyncPanel)
 		r.Post("/sync/all", h.SyncAll)
-		r.Post("/sync/wishlist-refresh", h.SyncWishlistRefresh)
-		r.Post("/sync/ownership", h.SyncOwnership)
 		r.Post("/sync/install", h.SyncInstallState)
-		r.Post("/sync/pricing", h.SyncPricing)
-		r.Post("/sync/wishlist", h.SyncWishlist)
-		r.Post("/sync/wishlist/gog", h.SyncGOGWishlist)
-		r.Post("/sync/import/heroic", h.ImportHeroic)
-		r.Post("/sync/import/heroic/upload", h.UploadHeroicFiles)
-		r.Post("/sync/deck", h.SyncDeckStatus)
-		r.Post("/sync/proton", h.SyncProtonRatings)
-		r.Post("/sync/steam-crossref", h.SyncSteamCrossRefs)
-		r.Post("/sync/enrich", h.RunEnrichment)
-		r.Post("/sync/enrich-wishlist", h.RunWishlistEnrichment)
 
 		// Logs
 		r.Get("/logs", h.Logs)
