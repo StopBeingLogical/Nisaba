@@ -2,7 +2,7 @@
 
 **Project:** Nisaba (Game Library & Wishlist Manager)  
 **Type:** Go web application (Docker/TrueNAS)  
-**Status:** Production (Atlas), development at `~/nextcloud/Mneme/code/nisaba/`  
+**Status:** Production (Atlas), development at `~/code/nisaba/`  
 **Live:** `nisaba.damnaliens.us` (port 8090 → container 8080)  
 **Maintenance:** Changelog system in `.changelog/UNRELEASED.md`
 
@@ -47,12 +47,12 @@ ssh truenas_admin@192.168.3.174   # key with passphrase — run ssh-add first
 ### Deploy loop (always do all three steps)
 ```bash
 # 1. Compile locally first — catch errors before touching the server
-cd ~/nextcloud/Mneme/code/nisaba
+cd ~/code/nisaba
 go build ./...
 
 # 2. Sync to server (always use these excludes)
 rsync -av --exclude='.git' --exclude='*.db' --exclude='imgcache' --exclude='._*' \
-  ~/nextcloud/Mneme/code/nisaba/ \
+  ~/code/nisaba/ \
   truenas_admin@192.168.3.174:/mnt/MemoryAlpha/nisaba/source/
 
 # 3. Deploy (requires interactive terminal for sudo)
@@ -63,7 +63,7 @@ ssh -t truenas_admin@192.168.3.174 "cd /mnt/MemoryAlpha/nisaba/source && bash de
 ```bash
 rsync -av --exclude='*.db' --exclude='imgcache' --exclude='._*' \
   truenas_admin@192.168.3.174:/mnt/MemoryAlpha/nisaba/source/ \
-  ~/nextcloud/Mneme/code/nisaba/
+  ~/code/nisaba/
 ```
 
 ### Query the live DB (sqlite3 is on the host, not in the container)
@@ -74,10 +74,12 @@ sqlite3 /mnt/MemoryAlpha/nisaba/data/nisaba.db "SELECT ..."
 ## Key Paths
 | Location | Path |
 |---|---|
-| Local working copy | `~/nextcloud/Mneme/code/nisaba/` |
+| Local working copy | `~/code/nisaba/` |
 | Production source | `atlas:/mnt/MemoryAlpha/nisaba/source/` |
 | Live database | `atlas:/mnt/MemoryAlpha/nisaba/data/nisaba.db` |
 | DB inside container | `/data/nisaba.db` |
+| Git origin (Forgejo) | `ssh://git@192.168.3.174:2222/bobby/nisaba.git` |
+| GitHub (remote `github`) | `https://github.com/StopBeingLogical/Nisaba.git` — auto-mirror, never push directly |
 
 **Note:** `atlas` = `truenas_admin@192.168.3.174` (SSH shorthand if configured)
 

@@ -9,6 +9,7 @@
 ---
 
 ## Top-Level Changes (Major only)
+- Fixed CLAUDE.md deploy/dev paths to ~/code/nisaba (dead Nextcloud scheme removed); git remotes corrected: origin → Forgejo SSH :2222, GitHub demoted to `github` mirror remote, token-embedded HTTP remote removed (2026-07-10)
 - Added Playnite-to-Nisaba automated library sync via PowerShell (2026-04-26)
 - Added support for dynamic storefronts (Xbox, Itch, Battle.net, etc.) via database migration
 - Added Chrome extension scrape API for mystery pack integration (2026-04-24)
