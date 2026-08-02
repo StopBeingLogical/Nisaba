@@ -1,0 +1,12 @@
+# Required context by task prefix. Read SESSION_SEED.md, spec/STATE.md, and
+# your assigned tasks.yaml entry first; then only these files plus the files in
+# your task's scope.
+#
+# This is a budget, not a bibliography. Do not recursively load the repo.
+
+SPEC: [spec/README.md]
+BASE: [spec/README.md, spec/PRODUCT.md]
+PERF: [spec/contracts/library-view.md, spec/contracts/database.md]
+GG: [spec/contracts/price-sources.md, spec/contracts/database.md]
+DEPLOY: [CLAUDE.md]
+REL: [spec/ACCEPTANCE.md, spec/PRODUCT.md]

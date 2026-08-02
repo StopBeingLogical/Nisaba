@@ -71,3 +71,6 @@
 - `- Replaced ITAD with gg.deals API for Steam pricing (2026-03-07)`
 - `- Added store page HTML scrape fallback for wishlist name resolution`
 - `- Fixed arrow visibility on game detail store links`
+
+## spec/ Changes
+- Added executable specification: SESSION_SEED.md, spec/ (PRODUCT, contracts, tasks.yaml, context-map, STATE, ACCEPTANCE, OPEN), scripts/spec-validate.sh + spec-next.sh (2026-08-01)

@@ -1,4 +1,13 @@
-# NISABA — Session Seed & Instructions
+# NISABA — Operational Reference
+
+> **Entry point for any session doing work:** read `SESSION_SEED.md` first,
+> then `spec/README.md`, `spec/STATE.md`, and your assigned entry in
+> `spec/tasks.yaml`. That set governs role, decision rights, and what gets
+> built. **This file is the operational reference** — stack, deploy loop, SSH,
+> auth, image proxy, IGDB behavior, conventions — and stays authoritative for
+> how the machine works. Where the two disagree about who decides something,
+> `SESSION_SEED.md` wins. The "Recent Session Context" section at the bottom is
+> history, not status; status lives in `spec/STATE.md`.
 
 **Project:** Nisaba (Game Library & Wishlist Manager)  
 **Type:** Go web application (Docker/TrueNAS)  

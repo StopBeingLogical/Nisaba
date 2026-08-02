@@ -1,0 +1,202 @@
+version: 1
+rules:
+  max_minutes: 60
+  single_in_progress: true
+  status_authority: this_file
+
+# Round: 2026-08-01 — library performance + GG.deals store names.
+# Scope is locked in spec/PRODUCT.md. Nothing here derives from spec/OPEN.md.
+# Tasks are written to be executable by a bounded local model OR a frontier
+# model; the capability label says which is safe, and it is not a claim
+# about you.
+
+tasks:
+  - id: SPEC-001
+    title: Add task-graph validator
+    status: ready
+    capability: bounded-coder
+    environment: [local]
+    depends_on: []
+    scope: [scripts/spec-validate.sh]
+    outcome: Validate IDs, states, dependencies, cycles, readiness, and the single-claim rule.
+    acceptance: ["scripts/spec-validate.sh"]
+
+  - id: SPEC-002
+    title: Add compatible next-task selector
+    status: blocked
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [SPEC-001]
+    scope: [scripts/spec-next.sh]
+    outcome: Print ready tasks filtered by supplied environment labels.
+    acceptance: ["scripts/spec-next.sh local", "scripts/spec-next.sh local,atlas"]
+
+  - id: BASE-001
+    title: Record the green baseline
+    status: blocked
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [SPEC-001]
+    scope: [spec/evidence/BASE-001.md]
+    outcome: Capture passing build, vet, and test output at the round's starting commit without source changes.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
+
+  - id: BASE-002
+    title: Delete the unused sqlc scaffolding
+    status: blocked
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [BASE-001]
+    scope: [sqlc.yaml, queries/]
+    outcome: Remove sqlc.yaml and queries/ so db/store.go is the only query source.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "test ! -e sqlc.yaml", "test ! -d queries"]
+
+  - id: BASE-003
+    title: Correct stale claims in the operational reference
+    status: blocked
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [BASE-002]
+    scope: [CLAUDE.md]
+    outcome: Drop the sqlc mention from the stack description now that the scaffolding is gone, and check the remaining claims against the assessment.
+    acceptance: ["grep -q SESSION_SEED.md CLAUDE.md", "! grep -q 'no sqlc' CLAUDE.md", "scripts/spec-validate.sh"]
+
+  - id: PERF-001
+    title: Copy the live database locally
+    status: blocked
+    capability: bounded-coder
+    environment: [atlas, local]
+    depends_on: [BASE-001]
+    scope: [spec/evidence/PERF-001.md]
+    outcome: Obtain a local read-only copy of the production database and record its row counts.
+    acceptance: ["test -s nisaba-perf.db", "sqlite3 nisaba-perf.db 'SELECT COUNT(*) FROM games;'", "grep -q 'COUNT' spec/evidence/PERF-001.md"]
+
+  - id: PERF-002
+    title: Capture the app's own library timing log
+    status: blocked
+    capability: bounded-coder
+    environment: [atlas]
+    depends_on: [BASE-001]
+    scope: [spec/evidence/PERF-002.md]
+    outcome: Record the elapsed times the running container already logs for page 1 and a later page.
+    acceptance: ["grep -c 'Library page loaded' spec/evidence/PERF-002.md"]
+
+  - id: PERF-003
+    title: Isolate the dominant cost in the library query
+    status: blocked
+    capability: strong-coder
+    environment: [local]
+    depends_on: [PERF-001, PERF-002]
+    scope: [spec/evidence/PERF-003.md]
+    outcome: Name which part of ListGames dominates, with EXPLAIN QUERY PLAN output and per-component timings. No source changes.
+    acceptance: ["grep -q 'EXPLAIN QUERY PLAN' spec/evidence/PERF-003.md", "grep -q 'Dominant cost' spec/evidence/PERF-003.md", "git diff --quiet -- db handlers main.go"]
+
+  - id: PERF-004
+    title: Propose the library performance fix
+    status: blocked
+    capability: frontier
+    environment: [local]
+    depends_on: [PERF-003]
+    scope: [spec/evidence/PERF-004.md]
+    outcome: One recommended approach with its measured basis, its cost, and what it does not fix. Bobby rules before PERF-005.
+    acceptance: ["grep -q 'Recommendation' spec/evidence/PERF-004.md", "grep -q 'Measured basis' spec/evidence/PERF-004.md", "git diff --quiet -- db handlers main.go"]
+
+  - id: PERF-005
+    title: Implement the ruled library performance fix
+    status: blocked
+    capability: strong-coder
+    environment: [local]
+    depends_on: [PERF-004]
+    scope: [db/store.go, main.go]
+    outcome: Apply the approach Bobby ruled on, preserving every filter, sort, and field in the library-view contract.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
+
+  - id: PERF-006
+    title: Verify the fix against the local database copy
+    status: blocked
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [PERF-005]
+    scope: [spec/evidence/PERF-006.md]
+    outcome: Record local query timings before and after, and confirm row output is unchanged for a fixed filter set.
+    acceptance: ["go test ./...", "grep -q 'before' spec/evidence/PERF-006.md", "grep -q 'after' spec/evidence/PERF-006.md"]
+
+  - id: DEPLOY-001
+    title: Deploy the library performance fix
+    status: blocked
+    capability: human
+    environment: [atlas]
+    depends_on: [PERF-006]
+    scope: [spec/evidence/DEPLOY-001.md]
+    outcome: Bobby confirms, then rsync and deploy.sh put the fix on Atlas. Never bundled into an implementation task.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]
+
+  - id: PERF-007
+    title: Verify the sub-second target on the deployed instance
+    status: blocked
+    capability: bounded-coder
+    environment: [network]
+    depends_on: [DEPLOY-001]
+    scope: [spec/evidence/PERF-007.md]
+    outcome: Confirm /library and a later page each serve in under 1 second, three runs each.
+    acceptance: ["curl -s -o /dev/null -w '%{time_total}\\n' http://192.168.3.174:8090/library", "curl -s -o /dev/null -w '%{time_total}\\n' 'http://192.168.3.174:8090/library?page=2'"]
+
+  - id: GG-001
+    title: Report on real-store-name price sources
+    status: blocked
+    capability: frontier
+    environment: [network, local]
+    depends_on: [BASE-001]
+    scope: [spec/evidence/GG-001.md]
+    outcome: Establish whether ITAD needs a paid or approved key and its rate limits, whether a GG.deals per-store endpoint exists, and what sync/itad.go already implements. Recommend one. Bobby rules before GG-002.
+    acceptance: ["grep -q 'Recommendation' spec/evidence/GG-001.md", "grep -q 'ITAD' spec/evidence/GG-001.md", "git diff --quiet -- sync"]
+
+  - id: GG-002
+    title: Implement the ruled price source
+    status: blocked
+    capability: strong-coder
+    environment: [local]
+    depends_on: [GG-001]
+    scope: [sync/, db/store.go]
+    outcome: New prices carry a real storefront name into best_current_store and wishlist_price_history, per the price-source contract.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
+
+  - id: GG-003
+    title: Map new store identifiers to display labels
+    status: blocked
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [GG-002]
+    scope: [handlers/handlers.go]
+    outcome: storeShortLabel maps the new provider's identifiers and falls back to the raw value, never to blank.
+    acceptance: ["go build ./...", "go test ./..."]
+
+  - id: DEPLOY-002
+    title: Deploy the price-source change
+    status: blocked
+    capability: human
+    environment: [atlas]
+    depends_on: [GG-003]
+    scope: [spec/evidence/DEPLOY-002.md]
+    outcome: Bobby confirms, then rsync and deploy.sh put the change on Atlas.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]
+
+  - id: GG-004
+    title: Verify real store names reach the UI
+    status: blocked
+    capability: bounded-coder
+    environment: [atlas, network]
+    depends_on: [DEPLOY-002]
+    scope: [spec/evidence/GG-004.md]
+    outcome: After a live pricing sync, confirm best_current_store holds real storefront names and the wishlist renders them.
+    acceptance: ["grep -q 'best_current_store' spec/evidence/GG-004.md"]
+
+  - id: REL-001
+    title: Record the completion gate
+    status: blocked
+    capability: strong-coder
+    environment: [local, network]
+    depends_on: [PERF-007, GG-004]
+    scope: [spec/evidence/REL-001.md, spec/STATE.md]
+    outcome: Verify every line of spec/ACCEPTANCE.md against one commit and record the result.
+    acceptance: ["scripts/spec-validate.sh", "go build ./...", "go vet ./...", "go test ./..."]

@@ -6,6 +6,11 @@ Named after the Sumerian goddess of writing and record-keeping.
 
 **Designed by [StopBeingLogical](https://github.com/StopBeingLogical) · Built by [Claude](https://claude.ai)**
 
+> **Working on Nisaba?** Start at [`SESSION_SEED.md`](SESSION_SEED.md), then
+> [`spec/README.md`](spec/README.md), [`spec/STATE.md`](spec/STATE.md), and your
+> assigned entry in [`spec/tasks.yaml`](spec/tasks.yaml). `CLAUDE.md` remains
+> the reference for how the machine works.
+
 ---
 
 ## Features
