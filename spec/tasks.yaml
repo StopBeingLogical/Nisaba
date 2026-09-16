@@ -93,7 +93,7 @@ tasks:
 
   - id: PERF-004
     title: Propose the library performance fix
-    status: blocked
+    status: done
     capability: frontier
     environment: [local]
     depends_on: [PERF-003]
