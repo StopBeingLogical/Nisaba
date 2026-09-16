@@ -103,7 +103,7 @@ tasks:
 
   - id: PERF-005
     title: Implement the ruled library performance fix
-    status: blocked
+    status: done
     capability: strong-coder
     environment: [local]
     depends_on: [PERF-004]
@@ -113,7 +113,7 @@ tasks:
 
   - id: PERF-006
     title: Verify the fix against the local database copy
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [PERF-005]

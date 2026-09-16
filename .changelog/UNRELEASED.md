@@ -21,6 +21,7 @@
 - Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
+- Narrowed the ListGames multi_store_owned EXISTS to a nested EXISTS — the JOIN-inside-EXISTS shape cost ~2.5s per library page under the pure-Go SQLite driver (2026-09-16)
 - Added FindGameByTitle() and makeSortTitle() for robust deduplication (2026-04-27)
 - Removed restrictive CHECK constraints from game_stores, wishlist_stores, and game_install_sources
 - Added mystery_pack_scrape_queues table for queueing scraped data

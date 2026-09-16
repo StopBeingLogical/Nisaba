@@ -106,8 +106,8 @@ SELECT
     (SELECT GROUP_CONCAT(store) FROM game_stores WHERE game_id = g.id AND owned = 1) AS owned_stores,
     CASE WHEN g.igdb_id IS NOT NULL AND EXISTS (
         SELECT 1 FROM games g2
-        JOIN game_stores gs2 ON gs2.game_id = g2.id AND gs2.owned = 1
         WHERE g2.igdb_id = g.igdb_id AND g2.id != g.id
+          AND EXISTS (SELECT 1 FROM game_stores gs2 WHERE gs2.game_id = g2.id AND gs2.owned = 1)
     ) THEN 1 ELSE 0 END AS multi_store_owned
 FROM games g %s
 WHERE %s
