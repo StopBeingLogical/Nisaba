@@ -33,7 +33,7 @@ tasks:
 
   - id: BASE-001
     title: Record the green baseline
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [SPEC-001]
