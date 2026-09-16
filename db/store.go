@@ -1,7 +1,6 @@
 // Package db provides direct database access methods for nisaba.
-// It mirrors the intent of the sqlc queries/ files but is implemented
-// with database/sql directly so the binary compiles without running sqlc.
-// Once sqlc is available, this package can be replaced with the generated output.
+// It is the only source of queries: the sqlc scaffolding was deleted
+// (BASE-002, 2026-09-16), so everything here is plain database/sql.
 package db
 
 import (
