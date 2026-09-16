@@ -29,11 +29,19 @@ Two changes, and only these two:
    **Pre-cutover history (ruled 2026-09-16): scorched earth.** When real store
    names arrive, existing rows holding `gg.deals/retail` or `gg.deals/keyshop`
    are deleted — not left mixed, not backfilled — so new price data starts
-   clean. `GG-002` executes it.
+   clean. `GG-002` executes it. **Confirmed 2026-09-16 ("yes, we are starting
+   with clean data"): this covers both columns — the `best_current_store` values
+   and the pre-cutover `wishlist_price_history` rows.**
    **Provider (ruled 2026-09-16): ITAD.** GG.deals represents more stores, but
    without real shop names that breadth is irrelevant, so ITAD is adopted on the
    strength of `shop.name` (`GG-001`). A different provider may displace it only
    if it is measured to supply real storefront names. Executed by `GG-002`.
+   **GG.deals is retained as a comparison source (ruled 2026-09-16).** ITAD is
+   authoritative for `best_current_*` and price history; the GG.deals price is
+   still fetched and kept beside it. Where GG.deals is cheaper than ITAD's best,
+   the wishlist entry shows a callout — the *existence* of a lower price plus a
+   link to that game's GG.deals page, and nothing about what the listing is or
+   which shop it comes from. Executed by `GG-005` (data) and `GG-006` (UI).
 
 Mystery-packs follow-through is **out of scope** for this round.
 

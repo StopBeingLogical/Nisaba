@@ -36,9 +36,13 @@ source.
 
 `DEPLOY-001` — Bobby confirms, then rsync + `deploy.sh` put the library fix on
 Atlas, and `PERF-007` verifies sub-second against the deployed instance. Nothing
-promotes itself. The GG chain (`GG-002` → `GG-003` → `DEPLOY-002` → `GG-004`) is
-ruled on provider and scope but still needs the two `OPEN.md` answers below, and
-`REL-001` closes the round.
+promotes itself.
+
+The GG chain is fully ruled as of 2026-09-16: `GG-002` (ITAD authoritative;
+scorched earth on both columns) → `GG-003` (shop-name labels) → `GG-005` (GG.deals
+kept as a comparison source) → `GG-006` (cheaper-on-GG.deals callout), with
+`DEPLOY-002` → `GG-004` for the live check, then the `REL-001` gate. `GG-002` needs
+`itad.api_key` in the live config first.
 
 ## Blockers
 
@@ -47,6 +51,7 @@ ruled on provider and scope but still needs the two `OPEN.md` answers below, and
   (`ssh truenas_admin@192.168.3.174` → `truenas`; live DB `games` = 4033).
 - `DEPLOY-001` and `DEPLOY-002` are `human` tasks: they need Bobby at a terminal,
   because `sudo docker` needs a TTY (`CLAUDE.md:94-95`).
-- `GG-002` is ruled on provider and scope but waits on two `OPEN.md` answers:
-  whether scorched earth covers `best_current_store` as well as history, and
-  whether the GG.deals entry point is retired.
+- `GG-002` needs `itad.api_key` present in the live `app_config`. Registered
+  2026-09-16 as `Nisaba_redux` and verified working against both endpoints used;
+  not yet loaded — that is Bobby's step in Settings.
+- `OPEN.md` has no unanswered entries as of 2026-09-16.

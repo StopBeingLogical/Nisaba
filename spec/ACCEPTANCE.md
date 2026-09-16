@@ -16,6 +16,9 @@ one commit. Every line is objectively checkable by whoever runs it.
   `gg.deals/keyshop`.
 - The wishlist UI renders those names, and an unmapped identifier degrades to
   the raw value rather than blank.
+- Where GG.deals is cheaper than ITAD's best current price, the wishlist entry
+  shows a callout linking to that game's GG.deals page (existence of the lower
+  price only — no listing or shop detail). Ruled 2026-09-16.
 - `sqlc.yaml` and `queries/` are gone and nothing references them.
 - `CLAUDE.md` and `README.md` route new sessions to `SESSION_SEED.md`.
 - No API key or secret appears in the repository, in task evidence, or in a

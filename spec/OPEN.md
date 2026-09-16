@@ -6,14 +6,6 @@ deleted.
 
 ## Awaiting a ruling
 
-- **Does the scorched-earth ruling cover `best_current_store` too, or only
-  `wishlist_price_history` rows?** `PRODUCT.md` was written from "scorched earth
-  for new data" and `GG-001` read it as both. Gates part of `GG-002`.
-
-- **Is the GG.deals sync entry point retired once ITAD is live, or kept
-  dormant?** `GG-001` recommended leaving the code in place, unused, but that is
-  a preference rather than a ruling. Gates the tail of `GG-002`.
-
 
 ## Model inferences, unratified
 
@@ -36,6 +28,13 @@ deleted.
   `PRODUCT.md`.
 - **sqlc / `queries/`** → ruled 2026-08-01: delete the scaffolding. Moved to
   `PRODUCT.md`; executed by `BASE-002`.
+- **Does scorched earth cover `best_current_store` too, or only history rows?**
+  → ruled 2026-09-16: both — "yes, we are starting with clean data".
+- **Is the GG.deals sync entry point retired once ITAD is live?** → ruled
+  2026-09-16: neither retired nor dormant — GG.deals stays as a **comparison**
+  source, and a cheaper GG.deals price surfaces as a wishlist callout linking to
+  that game's GG.deals page (existence only, no listing detail). Moved to
+  `PRODUCT.md`; executed by `GG-005` and `GG-006`.
 - **Which provider for real store names?** → ruled 2026-09-16: ITAD, on the
   strength of `shop.name`; GG.deals' store breadth is moot without shop names. An
   alternative may displace it only if measured to supply real storefront names.

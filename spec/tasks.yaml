@@ -158,7 +158,7 @@ tasks:
     environment: [local]
     depends_on: [GG-001]
     scope: [sync/, db/store.go]
-    outcome: New prices carry a real storefront name into best_current_store and wishlist_price_history, per the price-source contract.
+    outcome: New prices carry a real storefront name into best_current_store and wishlist_price_history, per the price-source contract, and set best_price_url from ITAD's current.url (present in the payload, unread today). Requires itad.api_key in app_config — Bobby registered the app ("Nisaba_redux", 2026-09-16); the key is not yet loaded into the live config.
     acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
 
   - id: GG-003
@@ -191,12 +191,32 @@ tasks:
     outcome: After a live pricing sync, confirm best_current_store holds real storefront names and the wishlist renders them.
     acceptance: ["grep -q 'best_current_store' spec/evidence/GG-004.md"]
 
+  - id: GG-005
+    title: Keep GG.deals as a comparison price source
+    status: blocked
+    capability: strong-coder
+    environment: [local]
+    depends_on: [GG-002]
+    scope: [main.go, sync/ggdeals.go, db/store.go]
+    outcome: Additive columns hold the GG.deals price and the game's GG.deals page URL, populated by the GG.deals sync, so a cheaper GG.deals price can be compared against ITAD's best current price. Bobby's ruling, 2026-09-16.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
+
+  - id: GG-006
+    title: Show the cheaper-on-GG.deals callout
+    status: blocked
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [GG-005]
+    scope: [handlers/, templates/]
+    outcome: A wishlist entry whose GG.deals price is lower than ITAD's best current price shows a callout linking to that game's GG.deals page — the existence of the lower price only, never what the listing is or which shop it is from.
+    acceptance: ["go build ./...", "go test ./...", "grep -q 'gg.deals' templates/wishlist_detail.html"]
+
   - id: REL-001
     title: Record the completion gate
     status: blocked
     capability: strong-coder
     environment: [local, network]
-    depends_on: [PERF-007, GG-004]
+    depends_on: [PERF-007, GG-004, GG-006]
     scope: [spec/evidence/REL-001.md, spec/STATE.md]
     outcome: Verify every line of spec/ACCEPTANCE.md against one commit and record the result.
     acceptance: ["scripts/spec-validate.sh", "go build ./...", "go vet ./...", "go test ./..."]
