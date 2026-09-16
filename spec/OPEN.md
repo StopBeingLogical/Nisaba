@@ -13,16 +13,6 @@ deleted.
   start. `CLAUDE.md:169` names the three candidates: switch to ITAD, a
   different GG.deals endpoint, or scrape the page.
 
-- **What happens to existing category-level store rows?** `best_current_store`
-  and `wishlist_price_history.store` already hold thousands of
-  `gg.deals/retail` / `gg.deals/keyshop` values. Once real store names arrive,
-  history is mixed. Options: leave them (new rows correct, old rows stale),
-  backfill from the new provider where it can resolve them, or drop the
-  pre-cutover price history. Note the constraint interaction: "never modify
-  existing rows" binds *migrations* (`CLAUDE.md:91-92`); a one-off backfill job
-  is a different thing, and whether that distinction is acceptable is Bobby's
-  call. No recommendation offered — this depends on how much he values the
-  existing 15,566 price-history entries.
 
 ## Model inferences, unratified
 
@@ -45,3 +35,7 @@ deleted.
   `PRODUCT.md`.
 - **sqlc / `queries/`** → ruled 2026-08-01: delete the scaffolding. Moved to
   `PRODUCT.md`; executed by `BASE-002`.
+- **Existing category-level store rows** → ruled 2026-09-16: scorched earth.
+  Pre-cutover `gg.deals/retail` / `gg.deals/keyshop` rows are deleted when real
+  store names arrive — neither left mixed nor backfilled. Moved to
+  `PRODUCT.md`; executed by `GG-002`.

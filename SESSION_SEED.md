@@ -102,10 +102,12 @@ Test: could a different model, reading only these files, resume exactly here?
 |---|---|---|
 | Implementation details inside one task; test organization; ordinary scoped commits after acceptance passes | Database access rules, the library view's behavior, price-source integration — see `spec/contracts/` | Product scope; deployment; deleting user data; which fix approach after a discovery task; relaxing any acceptance check; anything in `OPEN.md` |
 
-Never yours: pushing to any remote, force-push, `reset --hard`, history
-rewrites, touching the live database at
-`/mnt/MemoryAlpha/nisaba/data/nisaba.db`, changing the auth model, or exposing
-anything beyond the existing tunnel.
+Never yours: force-push, `reset --hard`, history rewrites, touching the live
+database at `/mnt/MemoryAlpha/nisaba/data/nisaba.db`, changing the auth model,
+or exposing anything beyond the existing tunnel.
+
+Pushing is authorized for Nisaba work (Bobby, 2026-09-16): push to the Forgejo
+`origin` as tasks land, never to the `github` mirror.
 
 ## Source and access
 

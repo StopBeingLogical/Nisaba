@@ -22,6 +22,10 @@ Two changes, and only these two:
    categories (`CLAUDE.md:169`). Real store names must reach the UI. **Which
    provider path gets used is deliberately not ruled yet** — a discovery task
    reports first, then Bobby rules. Ratified 2026-08-01.
+   **Pre-cutover history (ruled 2026-09-16): scorched earth.** When real store
+   names arrive, existing rows holding `gg.deals/retail` or `gg.deals/keyshop`
+   are deleted — not left mixed, not backfilled — so new price data starts
+   clean. `GG-002` executes it.
 
 Mystery-packs follow-through is **out of scope** for this round.
 

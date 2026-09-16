@@ -67,6 +67,12 @@ A task labeled above your tier is not yours. Say so and stop.
 
 `blocked`, `ready`, `in_progress`, `done`, `superseded`.
 
+**Statuses do not promote themselves** (Bobby's ruling, 2026-09-16). A task
+moves `blocked` → `ready` only when an executing session promotes it after every
+`depends_on` is `done`; the executor claims it `ready` → `in_progress`. A graph
+with nothing `ready` is stalled, not finished — `scripts/spec-next.sh` printing
+nothing means nothing was promoted.
+
 Only one task may be `in_progress`. A model claims it by changing status before
 implementation. If it cannot commit that claim, it states the claim in its
 first update and rechecks the worktree.
