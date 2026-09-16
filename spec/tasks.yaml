@@ -53,7 +53,7 @@ tasks:
 
   - id: BASE-003
     title: Correct stale claims in the operational reference
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [BASE-002]
@@ -63,7 +63,7 @@ tasks:
 
   - id: PERF-001
     title: Copy the live database locally
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [atlas, local]
     depends_on: [BASE-001]

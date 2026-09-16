@@ -43,7 +43,7 @@ Personal game library + wishlist manager. Go web app running in Docker on a True
 ## Tech Stack
 - **Go 1.25**, Chi v5 router, SQLite (WAL, single-writer), `html/template` with `//go:embed`
 - **Frontend:** HTMX + TailwindCSS (CDN), no build step
-- **DB layer:** Hand-rolled `db/store.go` (no ORM, no sqlc)
+- **DB layer:** Hand-rolled `db/store.go` (no ORM, no code generator)
 - **Docker:** single container on port 8090→8080, DB volume at `/data/`
 
 ## SSH & Deployment Workflow
