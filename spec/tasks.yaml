@@ -73,7 +73,7 @@ tasks:
 
   - id: PERF-002
     title: Capture the app's own library timing log
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [atlas]
     depends_on: [BASE-001]
@@ -83,7 +83,7 @@ tasks:
 
   - id: PERF-003
     title: Isolate the dominant cost in the library query
-    status: blocked
+    status: done
     capability: strong-coder
     environment: [local]
     depends_on: [PERF-001, PERF-002]
