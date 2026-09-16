@@ -43,7 +43,7 @@ tasks:
 
   - id: BASE-002
     title: Delete the unused sqlc scaffolding
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [BASE-001]
