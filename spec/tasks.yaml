@@ -13,7 +13,7 @@ rules:
 tasks:
   - id: SPEC-001
     title: Add task-graph validator
-    status: ready
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: []
@@ -23,7 +23,7 @@ tasks:
 
   - id: SPEC-002
     title: Add compatible next-task selector
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [SPEC-001]
