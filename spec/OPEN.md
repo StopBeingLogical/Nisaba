@@ -6,12 +6,13 @@ deleted.
 
 ## Awaiting a ruling
 
-- **Which GG.deals fix?** Deliberately deferred to `GG-001`, which reports on
-  ITAD's key/limit requirements, on whether a GG.deals endpoint with per-store
-  data exists, and on what `sync/itad.go` already implements. Bobby rules after
-  that task, and the ruling moves here → `PRODUCT.md` before `GG-002` may
-  start. `CLAUDE.md:169` names the three candidates: switch to ITAD, a
-  different GG.deals endpoint, or scrape the page.
+- **Does the scorched-earth ruling cover `best_current_store` too, or only
+  `wishlist_price_history` rows?** `PRODUCT.md` was written from "scorched earth
+  for new data" and `GG-001` read it as both. Gates part of `GG-002`.
+
+- **Is the GG.deals sync entry point retired once ITAD is live, or kept
+  dormant?** `GG-001` recommended leaving the code in place, unused, but that is
+  a preference rather than a ruling. Gates the tail of `GG-002`.
 
 
 ## Model inferences, unratified
@@ -35,6 +36,12 @@ deleted.
   `PRODUCT.md`.
 - **sqlc / `queries/`** → ruled 2026-08-01: delete the scaffolding. Moved to
   `PRODUCT.md`; executed by `BASE-002`.
+- **Which provider for real store names?** → ruled 2026-09-16: ITAD, on the
+  strength of `shop.name`; GG.deals' store breadth is moot without shop names. An
+  alternative may displace it only if measured to supply real storefront names.
+  Moved to `PRODUCT.md`; executed by `GG-002`. (An unsearched candidate remains
+  `CLAUDE.md:169`'s "scrape the page", and `GG-001` could not verify whether
+  another GG.deals endpoint carries per-shop data.)
 - **Existing category-level store rows** → ruled 2026-09-16: scorched earth.
   Pre-cutover `gg.deals/retail` / `gg.deals/keyshop` rows are deleted when real
   store names arrive — neither left mixed nor backfilled. Moved to

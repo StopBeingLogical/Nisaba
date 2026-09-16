@@ -16,6 +16,10 @@ Two changes, and only these two:
    under 1 second for page 1 and for any later page**, measured against the
    deployed instance the way the assessment measured it
    (`curl -s -o /dev/null -w '%{time_total}'`). Ratified 2026-08-01.
+   **Approach (ruled 2026-09-16): whatever serves responsiveness.** That is
+   `PERF-004`'s nested-`EXISTS` rewrite of the `multi_store_owned` arm in
+   `ListGames` — measured 2.53s → 0.011s for page 1, row output identical over
+   every row. Executed by `PERF-005`.
 2. **GG.deals store-name granularity.** GG.deals returns only category-level
    names (`gg.deals/retail`, `gg.deals/keyshop`), never individual stores, so
    `best_current_store` and `wishlist_price_history.store` are always
@@ -26,6 +30,10 @@ Two changes, and only these two:
    names arrive, existing rows holding `gg.deals/retail` or `gg.deals/keyshop`
    are deleted — not left mixed, not backfilled — so new price data starts
    clean. `GG-002` executes it.
+   **Provider (ruled 2026-09-16): ITAD.** GG.deals represents more stores, but
+   without real shop names that breadth is irrelevant, so ITAD is adopted on the
+   strength of `shop.name` (`GG-001`). A different provider may displace it only
+   if it is measured to supply real storefront names. Executed by `GG-002`.
 
 Mystery-packs follow-through is **out of scope** for this round.
 
