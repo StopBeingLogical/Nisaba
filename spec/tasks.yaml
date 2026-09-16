@@ -143,7 +143,7 @@ tasks:
 
   - id: GG-001
     title: Report on real-store-name price sources
-    status: blocked
+    status: done
     capability: frontier
     environment: [network, local]
     depends_on: [BASE-001]

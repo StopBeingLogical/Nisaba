@@ -5,8 +5,9 @@
 ## Current milestone
 
 Specification ratified; the SPEC and BASE chains are closed and both discovery
-tasks have reported. Nothing user-facing is implemented yet. The 2026-08-01
-round covers library page performance and GG.deals store-name granularity.
+tasks have reported — each ending in a ruling that is Bobby's. Nothing
+user-facing is implemented yet. The 2026-08-01 round covers library page
+performance and GG.deals store-name granularity.
 
 ## Established baseline
 
@@ -29,10 +30,11 @@ source.
 
 ## Next task
 
-`PERF-004` (propose the library performance fix) — promote it to `ready` first;
-it and `GG-001` are `frontier`-labeled and each ends in a recommendation Bobby
-rules on before the implementation task unblocks. Everything else is `blocked`,
-and a status only moves when someone promotes it.
+Nothing is promotable until Bobby rules. `PERF-004` and `GG-001` are `done`, and
+each ends in a decision that is his — the library fix (`PERF-005`) and the price
+provider (`GG-002`); both remain `blocked` for that reason, not for dependency
+order. After the rulings: `PERF-005` → `PERF-006` → `DEPLOY-001` → `PERF-007`, and
+`GG-002` → `GG-003` → `DEPLOY-002` → `GG-004`, then the `REL-001` gate.
 
 ## Blockers
 
