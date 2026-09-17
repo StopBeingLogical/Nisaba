@@ -77,7 +77,10 @@ Never assume state from memory. If you did not read it this session, check it.
 4. Add a changelog one-liner to `.changelog/UNRELEASED.md` under the right
    section (`db/`, `handlers/`, `sync/`, `schema/`), per `CLAUDE.md:140-151`.
 5. Update `spec/STATE.md`.
-6. Commit as `<task-id>: <outcome>`. Do not push. Do not deploy.
+6. Commit as `<task-id>: <outcome>`, and push to the Forgejo `origin` —
+   pushing is authorized for Nisaba work (Bobby, 2026-09-16; see Decision
+   rights). **Do not deploy**: deployment is always its own `atlas` task and
+   stops for Bobby's confirmation every time.
 
 Test: could a different model, reading only these files, resume exactly here?
 
