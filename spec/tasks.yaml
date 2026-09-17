@@ -158,7 +158,7 @@ tasks:
     environment: [local]
     depends_on: [GG-001]
     scope: [sync/, db/store.go]
-    outcome: New prices carry a real storefront name into best_current_store and wishlist_price_history, per the price-source contract, and set best_price_url from ITAD's current.url (present in the payload, unread today). Requires itad.api_key in app_config — Bobby registered the app ("Nisaba_redux", 2026-09-16); the key is not yet loaded into the live config.
+    outcome: New prices carry a real storefront name into best_current_store and wishlist_price_history, per the price-source contract, and set best_price_url from ITAD's current.url (present in the payload, unread today). Resolve ITAD IDs in bulk via POST /lookup/id/shop/61/v1 with "app/<steamid>" bodies rather than the per-entry GET loop, which at 667 entries is ~600 requests per 5 minutes against a 100-per-5-minute budget (Bobby's setup page; the docs say 1000) — verified live, GG-001 addendum 2. Requires itad.api_key in app_config — Bobby registered the app ("Nisaba_redux", 2026-09-16); the key is not yet loaded into the live config.
     acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
 
   - id: GG-003

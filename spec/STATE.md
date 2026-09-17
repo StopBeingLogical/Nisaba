@@ -57,4 +57,8 @@ kept as a comparison source) → `GG-006` (cheaper-on-GG.deals callout), with
 - `GG-002` needs `itad.api_key` present in the live `app_config`. Registered
   2026-09-16 as `Nisaba_redux` and verified working against both endpoints used;
   not yet loaded — that is Bobby's step in Settings.
+- `GG-002`'s approach is settled by `GG-001` addendum 2: bulk ID resolution via
+  `POST /lookup/id/shop/61/v1`, because the key's limit is 100 requests per
+  5 minutes (Bobby's setup page; the docs claim 1000), which the per-entry loop
+  would overrun 6×.
 - `OPEN.md` has no unanswered entries as of 2026-09-16.
