@@ -129,11 +129,25 @@ path (push, paste, the three config keys) stays, because the library sync
 authenticates with it, and the store methods it used are still live for the
 Steam wishlist (`evidence/GOGL-004.md`).
 
+**`GOGL-005` ran 2026-09-16** on Bobby's go-ahead (the live database is
+otherwise his alone). One DELETE against
+`/mnt/MemoryAlpha/nisaba/data/nisaba.db`: 58 entries, 58 store links and 7
+history rows went, wishlist 730 → 672, `gog_links_anywhere` 0, `quick_check`
+ok, and the files stayed `root:root` with no WAL residue. The first attempt was
+refused — the database is `root:root 644` and the SSH user is uid 950 — so it
+was re-run under `sudo -n`, which is how the root-running container writes it
+too. Backups of all three row sets are on Ergaster under `/tmp/gog005-backup-*`
+(`evidence/GOGL-005.md`).
+
+**Caveat until the deploy:** the running binary is the pre-round build, so a
+Full sync still recreates those entries — the DELETE is idempotent, but the rows
+come back until `DEPLOY-004` replaces the writer.
+
 ## Next task
 
-`GOGL-005` — delete the 58 stale `gog-wish-` entries (`ready`; needs `atlas` and
-your hand, since it is a deletion against the live database). Then `DEPLOY-004`
-puts the round on Atlas.
+`DEPLOY-004` — deploy the GOG round (`ready`; needs `atlas` and Bobby's
+confirmation). **Set `gog.client_secret` in Settings immediately after**, or the
+new library sync skips: the live config does not have it yet.
 
 The round that preceded this one is **deployed and verified** (`DEPLOY-003`):
 the live container reports its next price window as `2026-09-17 11:00` UTC, and
