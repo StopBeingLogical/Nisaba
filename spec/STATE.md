@@ -24,6 +24,13 @@ and `DEPLOY-007` cleaned it. The library went from **4101 tiles to 3390 games**,
 the multiple-stores flag from 796 wrong to **243 right**, and the database is
 clear of duplicates, reference links and stale errors. See below.
 
+A **second pass opened and closed the same day** (`PRODUCT-6.md`): `AUDIT-002`
+re-measured everything against the *cleaned* database and found the remaining
+gaps were **code, not debris** — `publisher` was empty on every game and the
+fetch never asked for companies. `ENRICH-001`, `DATA-004`, `DATA-005` and
+`DEPLOY-008` closed them: the library is now **3388 games**, unmatched games
+428 → **328**, and `publisher` is populated for the first time. See below.
+
 `OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
 rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
 should use `--delete`, and the three dormant fetchers (`SyncSteamDeckStatus`,
@@ -298,12 +305,71 @@ would have written wrong data.
 games Bobby does not own and still render with a badge. Recorded in
 `PRODUCT-5.md` as an unruled question, not actioned.
 
+## Enrichment round, second audit pass (2026-09-17) — complete
+
+Bobby asked again for *"a full audit and clean up of the data"*. `AUDIT-002`
+(`evidence/AUDIT-002.md`) re-measured every `AUDIT-001` category against the
+**post-cleanup** database. All clean, and the earlier repairs held: no duplicate
+wishlist identities, `game_stores.owned = 0` still 0 rows, `sync_errors` empty,
+games text fully clean, and the **124 family-sharing games intact** — they carry
+`owned = 1` and were never part of the deleted reference set.
+
+**Two of the remaining gaps were code, not data.** `publisher` was empty on
+**all 3390 games** because no code path writes it (`InsertGame` omits the column
+and `EnrichGame` never set it), and `IGDBGame` requested no companies at all — so
+`developer` (2089 empty) could never be backfilled by enrichment either.
+
+- **`ENRICH-001`** — the fetch now asks for
+  `involved_companies.company.name/developer/publisher`, and `EnrichGame` writes
+  `developer` and `publisher` through `COALESCE`. Title comparison also gained
+  three spelling equivalences and nothing more: `™`/`®`/`©` stripped from the
+  search string (a `®` made a query return zero results), `&` folded to `and`,
+  and canonical roman numerals normalised to arabic. Measured against live IGDB
+  on a `.backup` copy: **3 → 100 matches of 428**, 0 errors, idempotent on a
+  second run.
+- **`DATA-004`** — the 2 duplicate groups blocked only by `owned = 0` reference
+  links merged: **3390 → 3388 games**, duplicate groups 7 → **5**, all 3652
+  distinct store identifiers preserved. The remaining 5 each hold two genuine
+  owned ids for one store. The indicator reads **245**, up from 243, because two
+  split rows are now one row owned on two stores.
+- **`DATA-005`** — the 3 wishlist titles carrying `&amp;` decoded, and all three
+  then matched; the 12 entries whose current price sat below their own recorded
+  low had the low corrected. Both **3 → 0** and **12 → 0**.
+- **`DEPLOY-008`** — live, image **`310c30aa044f`** (previous `107c7ed2546b`).
+  Backfilled with real IGDB: games `needs_review` **428 → 328**, `developer`
+  1301 → **1327**, `publisher` **0 → 92**, wishlist `needs_review` 53 → **41**
+  (`igdb_id` and artwork 623 → **635**). `/library` renders **3388 games**. The
+  100 library matches are the number the scratch-copy dry run predicted.
+
+**The deploy tree is `source/`, not `app/`.** `/mnt/MemoryAlpha/nisaba/app/` is a
+stale March copy that nothing builds — it still holds a real
+`sync/gog_wishlist.go` deleted from the repo, which reads exactly like a
+dangerous rsync leftover and is not one. The live tree was verified to hold
+precisely the repo's **36** real `.go` files before deploying, because
+`deploy.sh` removes the container *before* it builds.
+
+**Unruled, with measurements attached:** the **328 games still unmatched**.
+Roughly half sit in IGDB under a decorated or abbreviated name (`Halcyon 6` →
+`Halcyon 6: Starbase Commander`, `GTA IV` → `Grand Theft Auto IV`,
+`LostWinds 2` → `LostWinds`). Catching those needs containment or
+suffix-stripping matching, which *can* pair a game with the wrong entry, so it
+was left as a question rather than assumed.
+
 ## Next task
 
-None — `DEPLOY-007` closed the data round on 2026-09-17, and
+None — `DEPLOY-008` closed the enrichment round on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
-**One observation is still outstanding, and it is the only gap in the round.**
+**Two gaps are recorded rather than closed, and neither blocks anything.**
+
+**The enrichment wiring is proven only out-of-band.** `DEPLOY-008`'s backfill
+called `EnrichLibrary`/`EnrichWishlist` directly, so the functions and the live
+result are proven and the **deployed Full-sync step is not**: no Full sync has
+run on image `310c30aa044f`. This is the same limit `DEPLOY-006` recorded. And
+the 328 unmatched games stay unmatched until a ruling says how far matching may
+loosen.
+
+**One observation from the previous round is still outstanding.**
 The backfill was run **out-of-band** on Bobby's choice, calling `EnrichWishlist`
 directly against the live database — because `/sync/all` sits behind session
 auth with no secret-based trigger and the binary has no sync CLI. So the

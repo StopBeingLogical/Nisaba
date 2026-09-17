@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -79,6 +80,37 @@ type IGDBGame struct {
 	Platforms []struct {
 		ID int `json:"id"`
 	} `json:"platforms"`
+	InvolvedCompanies []struct {
+		Developer bool `json:"developer"`
+		Publisher bool `json:"publisher"`
+		Company   *struct {
+			Name string `json:"name"`
+		} `json:"company"`
+	} `json:"involved_companies"`
+}
+
+// DeveloperName returns the companies IGDB credits as developer, comma-joined.
+// Empty when IGDB lists none, so callers can skip writing the column.
+func (g IGDBGame) DeveloperName() string {
+	var names []string
+	for _, ic := range g.InvolvedCompanies {
+		if ic.Developer && ic.Company != nil && ic.Company.Name != "" {
+			names = append(names, ic.Company.Name)
+		}
+	}
+	return strings.Join(names, ", ")
+}
+
+// PublisherName returns the companies IGDB credits as publisher, comma-joined.
+// Empty when IGDB lists none.
+func (g IGDBGame) PublisherName() string {
+	var names []string
+	for _, ic := range g.InvolvedCompanies {
+		if ic.Publisher && ic.Company != nil && ic.Company.Name != "" {
+			names = append(names, ic.Company.Name)
+		}
+	}
+	return strings.Join(names, ", ")
 }
 
 // HasPCPlatform returns true if this game entry includes PC (Windows), platform ID 6.
@@ -150,7 +182,8 @@ func (c *IGDBClient) query(body string) ([]IGDBGame, error) {
 	return results, nil
 }
 
-const igdbFields = "id,name,cover.url,genres.name,summary,first_release_date,url,platforms.id"
+const igdbFields = "id,name,cover.url,genres.name,summary,first_release_date,url,platforms.id," +
+	"involved_companies.company.name,involved_companies.developer,involved_companies.publisher"
 
 // FetchSteamAppIDs queries the IGDB /games endpoint for the given IGDB game
 // IDs, inspects the websites field for Steam store URLs, and returns a map of
@@ -318,7 +351,7 @@ func SyncSteamCrossRefs(store *db.Store, igdbClient *IGDBClient, progress func(d
 
 // SearchGame returns up to 5 IGDB results for the given title.
 func (c *IGDBClient) SearchGame(title string) ([]IGDBGame, error) {
-	escaped := strings.ReplaceAll(title, `"`, `\"`)
+	escaped := strings.ReplaceAll(searchTitle(title), `"`, `\"`)
 	body := fmt.Sprintf(`search "%s"; fields %s; limit 5;`, escaped, igdbFields)
 	return c.query(body)
 }
@@ -326,7 +359,7 @@ func (c *IGDBClient) SearchGame(title string) ([]IGDBGame, error) {
 // SearchGamePC returns up to 5 IGDB results for the given title, filtered to
 // games that include PC (Windows) as a platform (platform id = 6).
 func (c *IGDBClient) SearchGamePC(title string) ([]IGDBGame, error) {
-	escaped := strings.ReplaceAll(title, `"`, `\"`)
+	escaped := strings.ReplaceAll(searchTitle(title), `"`, `\"`)
 	body := fmt.Sprintf(
 		`search "%s"; fields %s; where platforms = (6); limit 5;`,
 		escaped, igdbFields,
@@ -356,6 +389,9 @@ func bestMatch(title string, results []IGDBGame) *IGDBGame {
 
 func normalizeTitle(s string) string {
 	s = strings.ToLower(s)
+	// Expand ampersands before punctuation is stripped, so "Orcs & Humans"
+	// and "Orcs and Humans" compare equal.
+	s = strings.ReplaceAll(s, "&", " and ")
 	// Strip leading articles
 	for _, pfx := range []string{"the ", "a ", "an "} {
 		if strings.HasPrefix(s, pfx) {
@@ -369,6 +405,75 @@ func normalizeTitle(s string) string {
 		}
 		return -1
 	}, s)
+	fields := strings.Fields(s)
+	// Rewrite roman-numeral tokens as arabic so "Might and Magic VI" and
+	// "Might and Magic 6" compare equal. Only tokens whose canonical roman
+	// spelling round-trips are converted, so words like "mix" are left alone.
+	for i, f := range fields {
+		if n, ok := romanToArabic(f); ok {
+			fields[i] = strconv.Itoa(n)
+		}
+	}
+	return strings.Join(fields, " ")
+}
+
+// romanToArabic parses a lowercase roman numeral, rejecting anything that is
+// not in canonical form (so "mix" and "did" are not numerals).
+func romanToArabic(s string) (int, bool) {
+	if len(s) < 2 || len(s) > 7 {
+		return 0, false
+	}
+	vals := map[byte]int{'i': 1, 'v': 5, 'x': 10, 'l': 50, 'c': 100, 'd': 500, 'm': 1000}
+	total, prev := 0, 0
+	for i := len(s) - 1; i >= 0; i-- {
+		v, ok := vals[s[i]]
+		if !ok {
+			return 0, false
+		}
+		if v < prev {
+			total -= v
+		} else {
+			total += v
+			prev = v
+		}
+	}
+	if total <= 0 {
+		return 0, false
+	}
+	if strings.ToLower(toRoman(total)) != s {
+		return 0, false
+	}
+	return total, true
+}
+
+// toRoman renders 1..3999 in canonical lowercase roman numerals.
+func toRoman(n int) string {
+	if n <= 0 || n > 3999 {
+		return ""
+	}
+	table := []struct {
+		v int
+		s string
+	}{
+		{1000, "M"}, {900, "CM"}, {500, "D"}, {400, "CD"},
+		{100, "C"}, {90, "XC"}, {50, "L"}, {40, "XL"},
+		{10, "X"}, {9, "IX"}, {5, "V"}, {4, "IV"}, {1, "I"},
+	}
+	var b strings.Builder
+	for _, e := range table {
+		for n >= e.v {
+			b.WriteString(e.s)
+			n -= e.v
+		}
+	}
+	return b.String()
+}
+
+// searchTitle prepares a store-supplied title for the IGDB search endpoint.
+// Trademark symbols are absent from IGDB names and make the search return
+// nothing for titles that carry them.
+func searchTitle(s string) string {
+	s = strings.NewReplacer("™", " ", "®", " ", "©", " ", "\u00a0", " ").Replace(s)
 	return strings.Join(strings.Fields(s), " ")
 }
 
@@ -454,13 +559,19 @@ func EnrichLibrary(store *db.Store, client *IGDBClient, progressFn func(EnrichPr
 		coverURL := match.CoverURL()
 		artJSON, _ := json.Marshal(buildArtwork(coverURL, coverURL, "", "", "", "igdb"))
 
-		var summary, releaseDate *string
+		var summary, releaseDate, developer, publisher *string
 		if match.Summary != "" {
 			s := match.Summary
 			summary = &s
 		}
 		if rd := match.ReleaseDate(); rd != "" {
 			releaseDate = &rd
+		}
+		if d := match.DeveloperName(); d != "" {
+			developer = &d
+		}
+		if name := match.PublisherName(); name != "" {
+			publisher = &name
 		}
 
 		if err := store.EnrichGame(db.EnrichGameParams{
@@ -469,6 +580,8 @@ func EnrichLibrary(store *db.Store, client *IGDBClient, progressFn func(EnrichPr
 			ArtworkJSON: string(artJSON),
 			Description: summary,
 			ReleaseDate: releaseDate,
+			Developer:   developer,
+			Publisher:   publisher,
 		}); err != nil {
 			p.Errors++
 		} else {

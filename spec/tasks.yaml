@@ -420,3 +420,55 @@ tasks:
     scope: [spec/evidence/DEPLOY-006.md]
     outcome: Bobby confirms, then rsync and deploy.sh put the wired wishlist enrichment on Atlas and a Full sync is run to backfill. The backfill is the sync itself, not a hand-run statement: the first run processes all 396 needs_review entries at 250ms each (~100s) and stamps each one. Record the before and after counts for entries with artwork and with an igdb_id, and the run's sync_log row.
     acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q 'before' spec/evidence/DEPLOY-006.md", "grep -q 'after' spec/evidence/DEPLOY-006.md"]
+
+  # ── Round 2026-09-17 (second pass) — ruling in spec/PRODUCT-6.md ─────────
+
+  - id: AUDIT-002
+    title: Second audit pass, after the cleanup
+    status: done
+    capability: strong-coder
+    environment: [local, atlas]
+    depends_on: [DEPLOY-007]
+    scope: [spec/evidence/AUDIT-002.md]
+    outcome: Re-measure every category from AUDIT-001 against the post-cleanup live database, read-only, and confirm the earlier work held. Establish that publisher is empty on all 3390 games and that the IGDB fetch requests no companies, so the gap is code rather than debris. Explain the 7 remaining duplicate groups, and identify which of them the DATA-002 guard excluded for no reason. Nothing is cleaned here; Bobby rules on the cleanup in PRODUCT-6.
+    acceptance: ["scripts/spec-validate.sh", "grep -q 'integrity_check' spec/evidence/AUDIT-002.md", "grep -q 'owned = 0' spec/evidence/AUDIT-002.md", "grep -q 'publisher' spec/evidence/AUDIT-002.md"]
+
+  - id: ENRICH-001
+    title: Fetch and persist developer and publisher, and widen spelling equivalence
+    status: done
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [AUDIT-002]
+    scope: [sync/igdb.go, db/store.go, spec/evidence/ENRICH-001.md]
+    outcome: Two changes in one pass. (a) Ask IGDB for involved_companies and write developer and publisher through COALESCE so an existing sync or hand-entered value is never overwritten. (b) Extend title comparison with three spelling equivalences only — strip trademark symbols from the search string, expand ampersand to and, and normalise canonical roman numerals to arabic. Do not add containment, prefix, or edition-stripping matching, and do not change the bestMatch exact-equality requirement; those can select the wrong entry and are left unruled. Verify against a .backup of the live database with real IGDB and record the before and after match counts.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'involved_companies' sync/igdb.go", "grep -q 'PUBLISHER' spec/evidence/ENRICH-001.md"]
+
+  - id: DATA-004
+    title: Merge the 2 duplicate groups the reference-link guard blocked
+    status: done
+    capability: human
+    environment: [atlas]
+    depends_on: [ENRICH-001]
+    scope: [spec/evidence/DATA-004.md]
+    outcome: Merge Wasteland 2 Director's Cut and Heretic Shadow of the Serpent Riders on the live database, keeping each survivor's identifier, after backing up games and game_stores. Their blockers were owned=0 reference links that DATA-003 already deleted, so no identifier is discarded. Leave the 5 groups that hold two genuine owned identifiers for one store. Record before and after row counts for games and duplicate groups, and both guards at zero.
+    acceptance: ["grep -q 'before' spec/evidence/DATA-004.md", "grep -q 'after' spec/evidence/DATA-004.md", "scripts/spec-validate.sh"]
+
+  - id: DATA-005
+    title: Repair the wishlist entity titles and the incoherent price pairs
+    status: done
+    capability: human
+    environment: [atlas]
+    depends_on: [AUDIT-002]
+    scope: [spec/evidence/DATA-005.md]
+    outcome: Two one-off repairs against the live database, with before and after counts. (a) Decode the 3 wishlist titles carrying HTML entities and rebuild their sort_title, since the literal amp guarantees an IGDB miss. (b) For the 12 entries whose best_current_price sits below their own historical_low_price, take the current price and store as the recorded low. Nothing else is touched.
+    acceptance: ["grep -q 'before' spec/evidence/DATA-005.md", "grep -q 'after' spec/evidence/DATA-005.md", "scripts/spec-validate.sh"]
+
+  - id: DEPLOY-008
+    title: Deploy the enrichment change and backfill the unmatched games
+    status: done
+    capability: human
+    environment: [atlas]
+    depends_on: [ENRICH-001]
+    scope: [spec/evidence/DEPLOY-008.md]
+    outcome: Bobby confirms, then rsync and deploy.sh put the company fetch, the developer and publisher writes, and the widened matcher on Atlas. Then run the enrichment backfill against the live database and record before and after counts for needs_review, developer, and publisher. Name plainly which part is proven by the out-of-band run and which can only be closed by the next Full sync the owner presses.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q 'before' spec/evidence/DEPLOY-008.md", "grep -q 'after' spec/evidence/DEPLOY-008.md"]

@@ -1833,10 +1833,13 @@ type EnrichGameParams struct {
 	ArtworkJSON string
 	Description *string
 	ReleaseDate *string
+	Developer   *string
+	Publisher   *string
 }
 
 // EnrichGame saves IGDB metadata and marks the game as 'matched'.
-// Description and ReleaseDate use COALESCE so they don't overwrite existing values.
+// Description, ReleaseDate, Developer and Publisher use COALESCE so they don't
+// overwrite values already supplied by a sync or by hand.
 func (s *Store) EnrichGame(p EnrichGameParams) error {
 	_, err := s.db.Exec(`
 UPDATE games SET
@@ -1844,10 +1847,12 @@ UPDATE games SET
     artwork           = ?,
     description       = COALESCE(?, description),
     release_date      = COALESCE(?, release_date),
+    developer         = COALESCE(?, developer),
+    publisher         = COALESCE(?, publisher),
     enrichment_status = 'matched',
     last_enriched     = CURRENT_TIMESTAMP
 WHERE id = ?`,
-		p.IGDBId, p.ArtworkJSON, p.Description, p.ReleaseDate, p.ID,
+		p.IGDBId, p.ArtworkJSON, p.Description, p.ReleaseDate, p.Developer, p.Publisher, p.ID,
 	)
 	return err
 }
