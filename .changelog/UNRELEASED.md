@@ -9,6 +9,7 @@
 ---
 
 ## Top-Level Changes (Major only)
+- Prices now refresh themselves once a day — a price-only scheduled sync (ITAD + GG.deals, ~8s) with the full sync left manual at ~15 minutes (2026-09-16)
 - Switched the pricing provider to ITAD so `best_current_store` and price history hold real storefront names; GG.deals is kept as a comparison source and feeds a "cheaper on GG.deals" callout (2026-09-16)
 - Removed the dead `sqlc.yaml` + `queries/` scaffolding — `db/store.go` is the only query source; CLAUDE.md stack line updated to match (2026-09-16)
 - Fixed CLAUDE.md deploy/dev paths to ~/code/nisaba (dead Nextcloud scheme removed); git remotes corrected: origin → Forgejo SSH :2222, GitHub demoted to `github` mirror remote, token-embedded HTTP remote removed (2026-07-10)
@@ -38,6 +39,7 @@
 - Added migration: price_thresholds table with 4 seeded default rows (2026-06-28)
 
 ## handlers/ Changes
+- Wishlist views show the GG.deals price where ITAD has no price, labelled GG.deals, instead of "no pricing data" (2026-09-16)
 - `storeShortLabel` maps ITAD storefront names (Humble Store → Humble, Epic Game Store → Epic, GreenManGaming → Green Man Gaming, Blizzard → Battle.net) and falls back to the raw value, never blank (2026-09-16)
 - Full sync now runs ITAD as the authoritative pricing step, then GG.deals as a comparison step; an unconfigured ITAD key logs and continues instead of failing the run (2026-09-16)
 - Added POST /api/sync/playnite for automated library updates (2026-04-26)
@@ -56,6 +58,7 @@
 - Added 3 lowest prices display to wishlist detail page (2026-06-28)
 
 ## sync/ Changes
+- Added `sync/schedule.go` — a daily price-only sync (`sync.price_hour`, default 11 = 07:00 US Eastern) that skips while another sync runs, skips without an ITAD key, and catches up after downtime (2026-09-16)
 - ITAD ID resolution is now one bulk `POST /lookup/id/shop/61/v1` per 100 Steam App IDs — 11 requests for the whole wishlist instead of ~609, which was 6× the key's 100-per-5-minute budget; the whole pricing pass dropped from ~13 minutes to 16.5 seconds (2026-09-16)
 - ITAD now writes `best_price_url` from the response's `current.url`, so deal links keep their affiliate tags rather than being reconstructed (2026-09-16)
 - Added standalone sync_playnite.ps1 PowerShell script for Playnite SDK (2026-04-26)

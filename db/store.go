@@ -1554,6 +1554,13 @@ func (s *Store) LatestSyncByType(syncType string) (*SyncLog, error) {
 	return &r, err
 }
 
+// HasRunningSync reports whether any sync is currently marked running.
+func (s *Store) HasRunningSync() (bool, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sync_log WHERE status = 'running'`).Scan(&n)
+	return n > 0, err
+}
+
 func (s *Store) StartSync(syncType string) (int64, error) {
 	res, err := s.db.Exec(
 		`INSERT INTO sync_log (type, status, started_at) VALUES (?, 'running', CURRENT_TIMESTAMP)`,

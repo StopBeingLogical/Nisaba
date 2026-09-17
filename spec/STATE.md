@@ -52,9 +52,32 @@ source.
 - Scorched earth (18,335 history rows, 493 category values) ran once, by hand,
   after the migrations — **not code**, and it never runs again.
 
+## Follow-up round (2026-09-16)
+
+Bobby ruled two changes after the 2026-08-01 gate closed; they are locked in
+`PRODUCT-2.md` and tracked as `PRICE-001`, `PRICE-002`, `DEPLOY-003`.
+
+- **`PRICE-001`** — the app now refreshes prices itself once a day: ITAD then the
+  GG.deals comparison, nothing else, ~8 seconds and ~11 requests against the
+  button's 14.6 minutes. Hour in `app_config` → `sync.price_hour` (default 11,
+  container clock = UTC, so 07:00 US Eastern). It skips while another sync runs,
+  skips when no ITAD key is set, and catches up at startup if the day's window
+  passed with prices 20 hours old. Verified locally, both the catch-up run and
+  the restart-does-not-rerun path (`evidence/PRICE-001.md`).
+- **`PRICE-002`** — where ITAD has no price and GG.deals does (4 entries), the
+  wishlist now shows that price labelled `GG.deals` instead of "no pricing data",
+  in the detail view and both list views. Display only; no shop is named
+  (`evidence/PRICE-002.md`).
+
+**Deferred by Bobby, not forgotten:** the GOG access token is expired, so the GOG
+wishlist is skipped on every full sync — `re-paste auth.json in Settings`.
+
 ## Next task
 
-None. The round's gate passed in full (`evidence/REL-001.md`); two gate lines are
+**`DEPLOY-003`** — rsync, rebuild, restart, set `sync.price_hour` on the live
+`app_config`, and confirm the startup log's announced window plus the fallback
+live. The 2026-08-01 gate itself passed in full (`evidence/REL-001.md`); two gate
+lines are
 recorded there as partial-with-explanation rather than claimed clean: "nothing
 references" the deleted sqlc scaffolding (13 files mention it, all describing the
 removal or the superseded design doc) and "no user data was deleted" (the ruled

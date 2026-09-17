@@ -18,6 +18,7 @@ import (
 
 	"nisaba/db"
 	"nisaba/handlers"
+	storesync "nisaba/sync"
 )
 
 //go:embed templates/*
@@ -85,6 +86,9 @@ func main() {
 	if err := store.ClearStalePrices("allkeyshop"); err != nil {
 		log.Printf("warn: clearing allkeyshop prices: %v", err)
 	}
+
+	// Refresh prices on a daily schedule rather than only on demand.
+	storesync.StartDailyPriceSync(store)
 
 	h := handlers.New(store, tmplFS, handlers.TemplateFuncMap(), dataDir)
 

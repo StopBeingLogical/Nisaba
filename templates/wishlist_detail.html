@@ -125,7 +125,19 @@
                 <div class="text-xs text-gray-700 mt-2">Updated {{ .Entry.LastPriceSync.String }}</div>
                 {{ end }}
                 {{ else }}
+                {{ if .Entry.GGDealsPrice.Valid }}
+                <div class="flex items-baseline justify-between">
+                    <span class="text-xl font-bold {{ priceClass .Entry.GGDealsPrice.Float64 0 }}">${{ printf "%.2f" .Entry.GGDealsPrice.Float64 }}</span>
+                    <span class="text-xs text-gray-500">GG.deals</span>
+                </div>
+                <div class="text-xs text-gray-600 mt-2">No storefront is currently listing this — GG.deals price shown</div>
+                {{ if .Entry.GGDealsURL.Valid }}
+                <a href="{{ .Entry.GGDealsURL.String }}" target="_blank" rel="noopener"
+                   class="text-xs text-amber-500 hover:text-amber-400 mt-2 inline-block">GG.deals ↗</a>
+                {{ end }}
+                {{ else }}
                 <p class="text-xs text-gray-500 italic">No pricing data — may be unreleased or delisted</p>
+                {{ end }}
                 {{ end }}
             </div>
 

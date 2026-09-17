@@ -215,7 +215,7 @@ tasks:
 
   - id: PRICE-001
     title: Add the daily price-only sync
-    status: in_progress
+    status: done
     capability: strong-coder
     environment: [local]
     depends_on: [GG-006]
@@ -225,7 +225,7 @@ tasks:
 
   - id: PRICE-002
     title: Show the GG.deals price where ITAD has none
-    status: ready
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [GG-006]
@@ -235,7 +235,7 @@ tasks:
 
   - id: DEPLOY-003
     title: Deploy the follow-up round
-    status: blocked
+    status: ready
     capability: human
     environment: [atlas]
     depends_on: [PRICE-001, PRICE-002]

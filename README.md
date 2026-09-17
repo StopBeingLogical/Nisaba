@@ -132,16 +132,19 @@ Settings are stored in the `app_config` table and managed through the `/settings
 |---|---|
 | `igdb.client_id` / `igdb.client_secret` | IGDB API credentials (Twitch app) |
 | `rawg.api_key` | RAWG API key (fallback enrichment) |
-| `ggdeals.api_key` | gg.deals API key (pricing) |
+| `itad.api_key` | IsThereAnyDeal API key — authoritative pricing, storefront names |
+| `ggdeals.api_key` | gg.deals API key (comparison price only) |
 | `steam.api_key` | Steam Web API key |
 | `steam.steam_id` | Your Steam ID64 |
 | `gog.refresh_token` | GOG OAuth refresh token |
 | `sync.api_secret` | Pre-shared secret for automated Playnite sync |
+| `sync.price_hour` | Hour (0–23, container clock) the daily price sync runs; not in the Settings UI, default 11 |
 
 ---
 
 ## Notes
 
+- Prices refresh once a day on their own (`sync/schedule.go`), ITAD then GG.deals only; the full sync stays manual because it also re-imports ownership, wishlists and enrichment
 - SQLite is configured with a single open connection (`SetMaxOpenConns(1)`) — this is intentional and must not be changed
 - Schema migrations are additive only (`ALTER TABLE ADD COLUMN`), idempotent, and run on every startup
 - The AKS scraper uses [`utls`](https://github.com/refraction-networking/utls) to impersonate a Chrome TLS fingerprint and avoid Akamai bot detection
