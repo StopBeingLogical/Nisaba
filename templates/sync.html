@@ -14,9 +14,10 @@
         <div class="sync-card">
             <div class="sync-card-title">Full Sync</div>
             <p class="text-sm text-gray-400 mb-4">
-                Sync ownership from Steam, GOG, Epic, and Amazon via Playnite.
-                Refresh Steam and GOG wishlists, fetch pricing, run IGDB enrichment,
-                and update Steam Deck compatibility — everything in one shot.
+                Sync ownership from Steam, Epic, Amazon and the rest. GOG comes
+                from the server, not Playnite. Refresh the Steam wishlist, fetch
+                pricing, run IGDB enrichment, and update Steam Deck compatibility
+                — everything in one shot.
             </p>
             <button
                 hx-post="/sync/all"
@@ -65,8 +66,10 @@
         <div class="sync-card">
             <div class="sync-card-title">Playnite Library Sync</div>
             <p class="text-xs text-gray-500 mb-3">
-                Sync your entire local library from Playnite (Windows) to Nisaba.
-                This replaces Heroic and GOG syncs, importing metadata, playtime, and ownership from all sources.
+                Sync your local library from Playnite (Windows) to Nisaba — Steam,
+                Epic, Amazon, Xbox, PlayStation, Battle.net and the rest. GOG is not
+                sent from here: the server syncs it once a day by itself. Imports
+                metadata, playtime, and ownership.
             </p>
 
             <div class="bg-gray-950 rounded p-3 mb-3 border border-gray-800">
@@ -98,6 +101,8 @@ for ($i = 0; $i -lt $allGames.Count; $i += $BatchSize) {
         if ($null -eq $g) { continue }
         if ($g.Categories -and ($g.Categories | Where-Object { $_.Name -eq "Steam Family Sharing" })) { continue }
         $source = if ($g.Source) { $g.Source.Name.ToLower() } else { "playnite" }
+        # GOG is synced by the server; sending it from here would fight that sync.
+        if ($source -eq "gog") { continue }
         $lastPlayed = if ($g.LastActivity) { $g.LastActivity.ToString("yyyy-MM-ddTHH:mm:ssZ") } else { "" }
         $releaseDate = ""
         if ($g.ReleaseDate) {

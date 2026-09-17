@@ -22,20 +22,6 @@ deleted.
   `*.db` and `imgcache` from deletion); (b) keep the command as it is and remove
   stale paths by hand at each deploy; (c) something else. Not derived into a task.
 
-- **May `sync_log` be rebuilt so its `type` constraint matches the code?**
-  `sync_log.type` allows only `('full', 'ownership', 'install', 'pricing',
-  'wishlist', 'rehydrate')` (`schema.sql:265`), but the code logs
-  `StartSync("playnite")` (`handlers/sync.go:323`) and
-  `StartSync("mystery_packs")` (`handlers/sync.go:470`). Both inserts fail the
-  constraint, `logID` stays 0, and `FinishSync`/`AppendSyncErrors` are skipped —
-  so **no Playnite run has ever appeared in Recent Activity and no Playnite
-  error is ever recorded**, and the same is true of mystery-pack analyses.
-  Verified 2026-09-16 on a throwaway copy of the live database: both inserts
-  error with `CHECK constraint failed`. No migration in `main.go` touches
-  `sync_log`. Fixing it means replacing the table (SQLite cannot alter a CHECK),
-  which the additive-and-idempotent-only migration ruling does not currently
-  allow. Not derived into a task.
-
 ## Model inferences, unratified
 
 - **The library fix may need a query-shape or schema change rather than an
@@ -70,6 +56,18 @@ deleted.
   Moved to `PRODUCT.md`; executed by `GG-002`. (An unsearched candidate remains
   `CLAUDE.md:169`'s "scrape the page", and `GG-001` could not verify whether
   another GG.deals endpoint carries per-shop data.)
+- **May `sync_log` be rebuilt so its `type` constraint matches the code?** →
+  ruled 2026-09-16: **no rebuild; log Playnite runs as type `ownership`.**
+  `sync_log.type` allows only `('full', 'ownership', 'install', 'pricing',
+  'wishlist', 'rehydrate')` (`schema.sql:265`) while the code logged
+  `StartSync("playnite")` (`handlers/sync.go:323`) and
+  `StartSync("mystery_packs")` (`handlers/sync.go:470`), which failed the
+  constraint — `logID` stayed 0, so `FinishSync`/`AppendSyncErrors` were skipped
+  and no Playnite run or error was ever recorded (verified 2026-09-16 on a
+  throwaway copy of the live database). Ruled rather than rebuilt, because
+  SQLite cannot alter a CHECK without replacing the table and migrations are
+  additive-only. Executed by `GOGL-007`. The `mystery_packs` call site keeps its
+  original type and is untouched.
 - **Existing category-level store rows** → ruled 2026-09-16: scorched earth.
   Pre-cutover `gg.deals/retail` / `gg.deals/keyshop` rows are deleted when real
   store names arrive — neither left mixed nor backfilled. Moved to

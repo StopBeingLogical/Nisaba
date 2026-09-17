@@ -314,3 +314,33 @@ tasks:
     scope: [spec/evidence/DEPLOY-004.md]
     outcome: Bobby confirms, then rsync and deploy.sh put the server-side GOG sync and the wishlist retirement on Atlas, and a library sync is confirmed live.
     acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]
+
+  - id: GOGL-006
+    title: Stop the Playnite script sending GOG games
+    status: done
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [DEPLOY-004]
+    scope: [templates/sync.html]
+    outcome: The embedded Playnite script skips entries whose source is gog, so GOG has one writer, and the card copy no longer claims Playnite replaces the GOG sync. Bobby's ruling, 2026-09-16 ("no need for playnite sync, at least for GOG").
+    acceptance: ["go build ./...", "go test ./...", "grep -q 'GOG is synced by the server' templates/sync.html"]
+
+  - id: GOGL-007
+    title: Log Playnite runs as an allowed sync_log type
+    status: done
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [DEPLOY-004]
+    scope: [handlers/sync.go]
+    outcome: Playnite runs and their errors record to sync_log and sync_errors as type 'ownership' instead of 'playnite', which the schema's CHECK rejected — so a run is visible in Recent Activity and its errors are kept. Ruled rather than rebuilding the table, 2026-09-16.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "! grep -q 'StartSync(\"playnite\")' handlers/sync.go"]
+
+  - id: DEPLOY-005
+    title: Deploy the Playnite corrections
+    status: ready
+    capability: human
+    environment: [atlas]
+    depends_on: [GOGL-006, GOGL-007]
+    scope: [spec/evidence/DEPLOY-005.md]
+    outcome: Bobby confirms, then rsync and deploy.sh put the Playnite script skip and its observable logging on Atlas. The embedded script only reaches the browser through the binary, so this deploy is what makes the change real for him.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]

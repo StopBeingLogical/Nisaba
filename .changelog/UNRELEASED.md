@@ -9,6 +9,7 @@
 ---
 
 ## Top-Level Changes (Major only)
+- Playnite is no longer the GOG owner: the embedded script skips `gog` entries (the server syncs GOG itself), while every other store keeps arriving through it, and Playnite runs are now visible in Recent Activity (2026-09-16)
 - Prices now refresh themselves once a day — a price-only scheduled sync (ITAD + GG.deals, ~8s) with the full sync left manual at ~15 minutes (2026-09-16)
 - Switched the pricing provider to ITAD so `best_current_store` and price history hold real storefront names; GG.deals is kept as a comparison source and feeds a "cheaper on GG.deals" callout (2026-09-16)
 - Removed the dead `sqlc.yaml` + `queries/` scaffolding — `db/store.go` is the only query source; CLAUDE.md stack line updated to match (2026-09-16)
@@ -39,6 +40,7 @@
 - Added migration: price_thresholds table with 4 seeded default rows (2026-06-28)
 
 ## handlers/ Changes
+- Playnite runs record to `sync_log` and `sync_errors` as type `ownership`; the old `playnite` value failed the schema's CHECK, so those runs and their errors were silently discarded and never reached Recent Activity (2026-09-16)
 - The full sync no longer runs a GOG wishlist pass — Steam is the only wishlist source, and the GOG settings card now documents itself as the library's credentials (2026-09-16)
 - Wishlist views show the GG.deals price where ITAD has no price, labelled GG.deals, instead of "no pricing data" (2026-09-16)
 - `storeShortLabel` maps ITAD storefront names (Humble Store → Humble, Epic Game Store → Epic, GreenManGaming → Green Man Gaming, Blizzard → Battle.net) and falls back to the raw value, never blank (2026-09-16)

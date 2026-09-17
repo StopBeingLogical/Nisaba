@@ -158,10 +158,32 @@ nothing mid-sync (`evidence/DEPLOY-004.md`). One near-miss: the deleted
 no `--delete`, and it would have failed the build after `deploy.sh` had already
 removed the container. Removed by hand; the wider tree drift is in `OPEN.md`.
 
+**`GOGL-006` and `GOGL-007` landed 2026-09-16**, from two rulings the same day
+("no need for playnite sync, at least for GOG. It can still be useful for all the
+other libraries"):
+
+- **`GOGL-006`** — the embedded Playnite script skips `source: "gog"` entries one
+  line after deriving the store, so GOG has a single writer; every other store
+  still arrives through Playnite unchanged. The Playnite and Full Sync card copy
+  was corrected in the same file, since both still claimed Playnite covers GOG
+  and that the full sync refreshes a GOG wishlist (`evidence/GOGL-006.md`).
+- **`GOGL-007`** — the Playnite endpoint now logs `sync_log` type `ownership`
+  instead of `playnite`, which the schema's CHECK rejected, leaving `logID` 0 and
+  silently discarding the run and its errors. No migration; the GOG scheduled run
+  shares the type, so the two are told apart by content. `mystery_packs` keeps its
+  invalid type by ruling (`evidence/GOGL-007.md`).
+
+Both are **not deployed**: the Playnite script only reaches a browser through the
+embedded template, so `DEPLOY-005` is what makes either change real.
+
 ## Next task
 
-None. The round is complete and deployed. Two things are **scheduled or pending
-rather than observed**:
+**`DEPLOY-005` — deploy the Playnite corrections** (promoted to `ready`
+2026-09-16; both dependencies are `done`). It is `human`/`atlas`, so it stops for
+Bobby's confirmation. Until it runs, a Playnite sync still posts GOG rows and
+still records nothing.
+
+Two things are **scheduled or pending rather than observed**:
 
 - **The first runs at 2026-09-17 11:00 UTC.** Watch for a `sync_log` row with
   `type='ownership'`, and expect `games_added` 3 for the GOG library.

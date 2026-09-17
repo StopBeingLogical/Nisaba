@@ -307,7 +307,7 @@ func (h *Handler) SyncPlaynite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("SyncPlaynite: received %d games", len(req.Games))
-	logID, _ := h.store.StartSync("playnite")
+	logID, _ := h.store.StartSync("ownership")
 	var added, updated int
 	var errors []string
 
@@ -372,7 +372,7 @@ func (h *Handler) SyncPlaynite(w http.ResponseWriter, r *http.Request) {
 			status = "partial"
 			errMsg = fmt.Sprintf("%d errors encountered", len(errors))
 			runID := time.Now().Format(time.RFC3339)
-			_ = h.store.AppendSyncErrors("playnite", runID, errors)
+			_ = h.store.AppendSyncErrors("ownership", runID, errors)
 		}
 		_ = h.store.FinishSync(logID, status, added, updated, errMsg)
 	}

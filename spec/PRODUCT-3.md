@@ -88,19 +88,32 @@ Two constraints are specific to this round:
 
 - **Reworking the Playnite path.** Steam, Epic, Amazon, Xbox, PlayStation and
   Battle.net ownership keep arriving exactly as they do now, script and all.
-  Only GOG leaves that dependency.
+  Only GOG leaves that dependency — the script change in (1) below is a one-line
+  skip, not a rework.
   **Confirmed 2026-09-16 ("no need for playnite sync, at least for GOG. It can
   still be useful for all the other libraries"):** GOG is not Playnite's job any
   more, and Playnite remains the path for the other stores — so an observable
   Playnite run still matters, and the `sync_log` constraint defect in `OPEN.md`
   is a live problem rather than a GOG one. GOG itself is unaffected: its sync
   records to `sync_log` as type `ownership`, which the schema allows.
+  **Two rulings followed the same day:**
+  1. **The Playnite script stops sending GOG games** (`GOGL-006`). It derives the
+     store from Playnite's plugin name, so it would otherwise keep posting
+     `source: "gog"` rows on the same store ids the server sync owns — both keyed
+     on the product id, so no duplicates, but two writers of one link.
+  2. **Playnite runs log as `sync_log` type `ownership`** (`GOGL-007`) — no
+     migration, so no exception to the additive-only rule. The GOG sync shares
+     that type; the two are told apart by their log lines and content. This is
+     the ruling on the `OPEN.md` constraint entry, which is now resolved rather
+     than parked.
 - **Deleting the dead Heroic code.** It is recorded as dead above; removing it
   is not part of this round.
 - **Manual wishlist entries.** Users can still add a non-Steam wishlist entry by
   hand; only the automated GOG wishlist source is retired.
-- **The `sync_log` constraint defect** (Playnite and mystery-pack runs cannot be
-  logged, so they never appear in Recent Activity). It is recorded in `OPEN.md`
-  and needs a ruling, because repairing it means rebuilding a table rather than
-  an additive migration.
+- **The `mystery_packs` half of the `sync_log` constraint defect.** Mystery-pack
+  runs still cannot be logged, because `StartSync("mystery_packs")`
+  (`handlers/sync.go:457`) fails the same CHECK the Playnite call site did. The
+  2026-09-16 ruling covered Playnite only, so the call site keeps its original
+  type and remains invisible in Recent Activity; giving it a valid type is a
+  ruling that has not been made.
 - **Any Settings UI for the schedule hour**, price cadence, or enrichment.
