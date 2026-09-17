@@ -1,6 +1,6 @@
 # Current specification state
 
-**Updated:** 2026-09-16
+**Updated:** 2026-09-17
 
 ## Current milestone
 
@@ -9,9 +9,15 @@ evidence. Both changes landed: library responsiveness (5.63s → 0.081s, target
 <1s) and real storefront names in price data and the UI, with GG.deals kept as a
 comparison source. The gate is recorded in `evidence/REL-001.md`.
 
-The follow-up round closed with `DEPLOY-003` and the **GOG round is now open**
-(below). `OPEN.md` has one unanswered entry — the `sync_log` constraint defect
-no task may derive from.
+The follow-up round closed with `DEPLOY-003`. The **GOG round (below) opened,
+ran as `GOGL-001`…`GOGL-007`, and closed with `DEPLOY-005`** — the only tasks
+left are the two Bobby-side actions listed under *Next task*.
+
+`OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
+rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
+should use `--delete`, and the three dormant fetchers (`SyncSteamDeckStatus`,
+`SyncProtonRatings`, `SyncSteamCrossRefs`) that nothing calls. Nothing may derive
+work from any of them; they need a ruling first.
 
 ## Established baseline
 
@@ -72,6 +78,9 @@ Bobby ruled two changes after the 2026-08-01 gate closed; they are locked in
 
 **Deferred by Bobby, not forgotten:** the GOG access token is expired, so the GOG
 wishlist is skipped on every full sync — `re-paste auth.json in Settings`.
+**Superseded by the round below (2026-09-16):** the GOG wishlist is retired and
+its rows deleted, and that same token now serves the server-side GOG library
+sync, which refreshes it itself.
 
 ## GOG round (2026-09-16) — open
 
@@ -188,25 +197,35 @@ builds. `/`, `/library` and `/wishlist` are 200; wishlist 672 with 0 GOG entries
 None. The round is complete and deployed, and `scripts/spec-next.sh` prints
 nothing.
 
-Two things are **scheduled or pending rather than observed**:
+**Both scheduled runs fired on 2026-09-17 and were observed**, exactly as
+predicted — `sync_log` id 87 `pricing` (539 updated) and id 88 `ownership`
+(**3 added**, the three games the library view held and the database did not), no
+errors on either. `game_stores` `gog` rows went 1037 → **1040** with **992** now
+carrying GOG's canonical URL, where the column had never held one; `gog-wish-`
+rows are 0. A **Full sync ran at 20:47 on the new binary** (id 89, 677 added) and
+recreated none of them, so the retired writer is measurably gone rather than
+merely deleted (`evidence/DEPLOY-005.md`).
 
-- **The first runs at 2026-09-17 11:00 UTC.** Watch for a `sync_log` row with
-  `type='ownership'`, and expect `games_added` 3 for the GOG library.
-- **`gog.client_secret` is not set in the live config.** The first run will try
-  to refresh, fail with "GOG client secret is not set", and fall back to the
-  stored token, which GOG still accepts — so the run should still succeed, but
-  the fallback only holds while GOG keeps honouring that token. Set the secret
-  in Settings; it is the public Galaxy constant published in Heroic's `gogdl`,
-  not something Praxis holds.
+Two actions remain, both Bobby's, and neither blocks anything:
+
+- **Set `gog.client_secret` in Settings.** It is still unset in the live config,
+  so row 88 ran on the fallback: the refresh was never attempted and GOG accepted
+  the stored access token whose recorded expiry passed in March. The GOG sync
+  keeps working only while GOG keeps honouring that token — the day it stops, the
+  sync fails until the secret is set. It is the public Galaxy constant published
+  in Heroic's `gogdl`, so it is a paste through the tunnel, not a machine.
+- **Re-copy the Playnite script from the Sync page.** `GOGL-006` is in the served
+template, but the Windows-side copy still posts GOG until it is replaced. No
+Playnite run has happened since `DEPLOY-005`, so this is untested rather than
+broken.
 
 The round that preceded this one is **deployed and verified** (`DEPLOY-003`):
 the live container reports its next price window as `2026-09-17 11:00` UTC, and
 the GG.deals fallback renders for all five of the entries it applies to.
 
-**One thing is scheduled rather than observed:** the first automatic price run
-has not happened yet — it is 2026-09-17 11:00 UTC. Verify by looking for a
-`sync_log` row with `type='pricing'`, `status='done'`, ~500 in `games_updated`.
-The mechanism itself is proven in `evidence/PRICE-001.md`.
+**One thing was scheduled rather than observed, and is now observed:** the first
+automatic price run fired at 2026-09-17 11:00 UTC — `sync_log` id 87,
+`type='pricing'`, `status='done'`, 539 updated, no error.
 
 The 2026-08-01 gate passed in full (`evidence/REL-001.md`); two gate
 lines are
@@ -216,14 +235,15 @@ removal or the superseded design doc) and "no user data was deleted" (the ruled
 scorched-earth delete removed pre-cutover *price* rows; no entry, game, or
 user-authored field was touched).
 
-A full sync from the UI has not been run since the cutover, so the current prices
-arrived via the one-off harness rather than the button — the next button-driven
-sync will exercise the same code path and log to `sync_log`.
+A full sync from the UI has now been run: `sync_log` id 89, `2026-09-17 20:47:24`
+to `20:59:45`, `done`, 677 added and 543 updated, no error. The earlier cutover
+prices arrived via a one-off harness rather than the button; the button path is
+now exercised on the deployed build, and it logged to `sync_log` as expected.
 
 ## Blockers
 
-None. `OPEN.md` has no unanswered entries, no task is blocked, and the deployed
-instance is healthy.
+None. `OPEN.md` holds three unanswered entries, but nothing derives work from
+them, no task is blocked, and the deployed instance is healthy.
 
 Reference facts a future session should not have to re-derive:
 

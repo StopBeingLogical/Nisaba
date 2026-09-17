@@ -64,9 +64,20 @@ rsync -av --exclude='.git' --exclude='*.db' --exclude='imgcache' --exclude='._*'
   ~/code/nisaba/ \
   truenas_admin@192.168.3.174:/mnt/MemoryAlpha/nisaba/source/
 
-# 3. Deploy (requires interactive terminal for sudo)
-ssh -t truenas_admin@192.168.3.174 "cd /mnt/MemoryAlpha/nisaba/source && bash deploy.sh"
+# 3. Deploy — no TTY needed; sudo is passwordless for truenas_admin
+ssh truenas_admin@192.168.3.174 "cd /mnt/MemoryAlpha/nisaba/source && bash deploy.sh"
 ```
+
+**Check the server tree before step 3.** `deploy.sh` runs `docker rm -f nisaba`
+*before* it builds, so a build failure there takes the site down instead of just
+failing the deploy. The rsync above has no `--delete`, so files the repository
+has deleted survive on the server — `DEPLOY-004` hit exactly this, with a stale
+`sync/gog_wishlist.go` duplicating symbols in the new `sync/gog_auth.go`. Compare
+the two trees (and `grep` for the functions you added) while the container is
+still up. Whether to add `--delete` is an open question in `spec/OPEN.md`.
+
+`._*` resource forks left by an older macOS rsync are not a build risk: Go
+ignores filenames beginning with `.` or `_`. A deleted **real** `.go` file is.
 
 ### Sync server → local (backup)
 ```bash
@@ -119,16 +130,53 @@ Always include `--exclude='._*'` in rsync commands. macOS creates `._filename` r
 - Username is hardcoded: `bobby`
 - Password stored as bcrypt hash in `app_config` table under key `auth.password_hash`
 - Set/change password: `sudo docker exec nisaba /app/nisaba -set-password 'password'`
-- Public routes: `/`, `/library`, `/library/{id}`, `/wishlist`, `/wishlist/{id}`, `/static/*`, `/img/proxy`, `/sync/status`, `/auth/login`, `/api/sync/playnite` (secret required)
+- Public routes: `/`, `/library`, `/library/search`, `/library/{id}`, `/wishlist`, `/wishlist/{id}`, `/static/*`, `/img/proxy`, `/sync/status`, `/auth/login`, `/api/sync/playnite`, and the mystery-pack API (`/api/mystery-packs/scrape/queue`, `/scrape/review`, `/scrape/apply`, `/lookup-game`) — those four are unauthenticated by design in `main.go` ("no auth, raw data only")
+- `/api/sync/playnite` is public but validates `X-Nisaba-Secret` against `sync.api_secret` when that key is set
 - Everything else requires auth
 
 ## Database Migrations Added (beyond schema.sql)
-All in `runMigrations()` in `main.go`:
-- `wishlist_entries.flag_remove` — INTEGER, default 0
-- `price_thresholds` table
-- `sync_errors` table + index
-- `wishlist_entries.best_price_url` — TEXT
-- Store Constraints: Removed hardcoded `CHECK` constraints on `store` columns via `migrateStoreConstraints()` to support arbitrary Playnite sources.
+All in `runMigrations()` in `main.go`, and all additive and idempotent:
+
+- Columns: `wishlist_entries.flag_remove` (INTEGER, default 0),
+  `wishlist_entries.best_price_url`, `wishlist_entries.gg_deals_price`,
+  `wishlist_entries.gg_deals_url` (all TEXT/REAL as named)
+- Tables: `price_thresholds`, `sync_errors`, and the mystery-pack set
+  (`mystery_pack_sites`, `mystery_packs`, `mystery_pack_games`,
+  `mystery_pack_analysis`, `mystery_pack_scrape_queues`, `mystery_pack_offers`,
+  `mystery_pack_price_history`)
+- Indexes: `idx_sync_errors_type`, `idx_game_genres_game_id`,
+  `idx_game_tags_game_id`, `idx_game_stores_game_id_owned`,
+  `idx_games_visible`, `idx_games_igdb_id`
+- Seed rows: four `price_thresholds` (Instant Buy $2, Consider $5, Moderate $10,
+  Sale Watch $20), inserted `OR IGNORE`
+- Store constraints: hardcoded `CHECK` constraints on the `store` columns were
+  removed by `migrateStoreConstraints()` so arbitrary Playnite sources can be
+  stored. `sync_log.type`'s CHECK was **not** removed — see the Scheduled jobs
+  section above and `spec/OPEN.md`.
+
+## Scheduled jobs and the GOG credential
+
+Two daily jobs live in `sync/schedule.go` and are started from `main.go`. Each
+has its own configured hour and records to `sync_log` under its own type:
+
+| Job | Hour key (0–23, container clock) | Default | `sync_log.type` |
+|---|---|---|---|
+| Prices — ITAD then GG.deals, price columns only | `sync.price_hour` | 11 | `pricing` |
+| GOG library — refresh token, then the library view | `sync.gog_hour` | 11 | `ownership` |
+
+Neither hour is in the Settings UI. A run that fails is recorded once and waits
+for the next window; the manual Full sync is the recovery path. The price job
+never touches ownership, wishlists, resellers or enrichment.
+
+**GOG credentials.** `gog.refresh_token` (pasted from `auth.json`) is the only
+one that has to come from Bobby. `sync/gog_auth.go` refreshes it against
+`auth.gog.com/token`, which requires `gog.client_secret` — the Galaxy client
+secret, a public constant published in Heroic's `gogdl`, not something Praxis
+holds. The refresh returns a *rotated* refresh token and both are written back to
+`app_config`. Without `gog.client_secret` the helper logs the failure and falls
+back to `gog.access_token`, which keeps the sync alive only while GOG still
+honours that token. All three keys are credentials: never in evidence, never in a
+changelog entry, never rendered in HTML.
 
 ## Image Proxy
 All external images are served through `/img/proxy?url=...` to bypass corporate firewall CDN blocks. Disk cache at `/data/imgcache/`, 7-day TTL. The `proxyURL` template func handles encoding. CSS background images in `static/app.css` are also proxied.
@@ -177,7 +225,7 @@ All external images are served through `/img/proxy?url=...` to bypass corporate 
 - **StoreShortLabel improved:** Mapped `gg.deals/retail` → "GG Retail", `gg.deals/keyshop` → "GG Keyshops". Added explicit mappings for Steam, GOG, Epic, Amazon, Humble, Fanatical.
 
 ### Blockers / Known Issues
-- **GG.deals store names are category-level only** — API returns `gg.deals/retail` or `gg.deals/keyshop`, never individual store names. The `best_current_store` and `wishlist_price_history.store` values are always these categories. Fix options: (a) switch to ITAD sync (provides real store names via `p.Current.Shop.Name`), (b) different GG.deals endpoint, (c) scrape GG.deals URL page.
+- **GG.deals store names are category-level only** — API returns `gg.deals/retail` or `gg.deals/keyshop`, never individual store names. **Resolved 2026-09-16:** ITAD now owns `best_current_*` and price history and supplies real `shop.name` values; GG.deals is a comparison source writing only `gg_deals_price` / `gg_deals_url`. See `spec/STATE.md`, not this section, for current status.
 
 ### Working context
 - Live DB stats: 3675 games, 558 wishlist entries, 15566 price history entries (403 of 558 have prices).

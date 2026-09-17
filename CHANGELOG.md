@@ -24,7 +24,7 @@ For detailed changes, see subdirectory changelogs:
 - **3 Lowest Prices** — Window-function query returns top-3 cheapest store prices per wishlist entry, displayed as "Best Prices" card with "View deal ↗" link.
 
 ### Changed
-- Refactored `sync_log` type checking to support mystery pack sync events.
+- ~~Refactored `sync_log` type checking to support mystery pack sync events.~~ **Corrected 2026-09-17: it was not.** `schema.sql` still allows only `('full', 'ownership', 'install', 'pricing', 'wishlist', 'rehydrate')`, and `StartSync("mystery_packs")` (`handlers/sync.go:457`) fails that CHECK, so those runs and their errors are never recorded. The Playnite half of the same defect was fixed in `GOGL-007`; the mystery-pack half is an open question in `spec/OPEN.md`.
 - `storeShortLabel` now maps `gg.deals/retail` → "GG Retail" and `gg.deals/keyshop` → "GG Keyshops" with explicit names for Steam, GOG, Epic, Amazon, Humble, Fanatical.
 
 ---

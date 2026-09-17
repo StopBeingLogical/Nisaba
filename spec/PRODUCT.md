@@ -23,7 +23,8 @@ Two changes, and only these two:
 2. **GG.deals store-name granularity.** GG.deals returns only category-level
    names (`gg.deals/retail`, `gg.deals/keyshop`), never individual stores, so
    `best_current_store` and `wishlist_price_history.store` are always
-   categories (`CLAUDE.md:169`). Real store names must reach the UI. **Which
+   categories (`CLAUDE.md` → Recent Session Context, `GG-001`). Real store
+   names must reach the UI. **Which
    provider path gets used is deliberately not ruled yet** — a discovery task
    reports first, then Bobby rules. Ratified 2026-08-01.
    **Pre-cutover history (ruled 2026-09-16): scorched earth.** When real store
@@ -83,17 +84,18 @@ source of truth for queries. Nisaba is not adopting a code generator.
 ## Constraints that must hold (existing rulings)
 
 - `sqlDB.SetMaxOpenConns(1)` is intentional and is never removed
-  (`CLAUDE.md:88-89`).
+  (`CLAUDE.md` → Critical Constraints → SQLite single-writer).
 - Schema changes are additive and idempotent, in `runMigrations()` in
   `main.go`. Never DROP or rename a column; never modify existing rows in a
-  migration (`CLAUDE.md:91-92`).
+  migration (`CLAUDE.md` → Critical Constraints → Additive migrations only).
 - The deployed instance stays working. Library filters, sorting, search, and
   pagination keep their current behavior unless a ruling changes them.
 - No comments added to unchanged code; no docstrings retrofitted; no error
-  handling for impossible cases (`CLAUDE.md:131-136`).
-- Secrets are never rendered as `value=` in HTML (`CLAUDE.md:135`).
+  handling for impossible cases (`CLAUDE.md` → Coding Conventions).
+- Secrets are never rendered as `value=` in HTML (`CLAUDE.md` → Coding
+  Conventions).
 - Changelog one-liners go to `.changelog/UNRELEASED.md` as work happens
-  (`CLAUDE.md:140-151`).
+  (`CLAUDE.md` → Changelog Maintenance).
 
 ## Not in scope
 

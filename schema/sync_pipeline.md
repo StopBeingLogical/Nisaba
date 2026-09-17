@@ -1,5 +1,28 @@
 # Sync Pipeline
 
+> **Partly superseded — pre-implementation design doc.** This describes the plan,
+> not the shipped system. Retained as history; `CLAUDE.md` and the code are
+> authoritative. Where the shipped system differs, as of 2026-09-17:
+>
+> - **Ownership does not come from direct store APIs** except Steam. Epic, Amazon,
+>   Xbox, PlayStation and Battle.net ownership arrives from **Playnite** on Windows
+>   via `POST /api/sync/playnite`. GOG is neither: it syncs **server-side** once a
+>   day (`sync.gog_library.go`, `sync.gog_auth.go`), from GOG's library view
+>   (`embed.gog.com/account/getFilteredProducts`), refreshing its own token first.
+>   The `/user/data/games` call below is deliberately unused — its 1397 ids include
+>   358 entitlements GOG's own library view hides.
+> - **Install state is Steam-only in the UI.** `/sync` reads `appmanifest_*.acf`
+>   through the browser's File System Access API. The Heroic/Galaxy file formats
+>   below are not implemented.
+> - **Pricing is ITAD-authoritative**, with GG.deals as a comparison source and
+>   reseller scrapers for non-Steam entries. The ITAD section below is a sketch of
+>   the bulk endpoints actually used; `spec/contracts/price-sources.md` governs.
+> - **The wishlist is Steam-only.** The GOG wishlist section below is retired
+>   (`GOGL-004`), and its 58 rows are deleted (`GOGL-005`).
+> - **The Sync All sequence below is not the sequence.** The shipped Full sync is
+>   Steam ownership → Steam wishlist → ITAD pricing → GG.deals comparison →
+>   reseller pricing → IGDB enrichment (`handlers/sync.go`, `SyncAll`).
+
 The sync panel splits into three independent operations, each triggerable separately
 or together via "Sync All".
 

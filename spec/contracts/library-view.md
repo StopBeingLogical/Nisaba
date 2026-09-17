@@ -21,7 +21,7 @@ below still behaves exactly as it does today.
   playtime, genres, tags, owned stores, and the multi-store-owned indicator.
 - The elapsed-time log in `handlers/library.go:117-119` stays. It is the
   in-repo instrument for this work.
-- Images continue to be served through `/img/proxy` (`CLAUDE.md:122-123`).
+- Images continue to be served through `/img/proxy` (`CLAUDE.md` → Image Proxy).
 
 ## Performance requirement
 

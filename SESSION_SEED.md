@@ -75,7 +75,8 @@ Never assume state from memory. If you did not read it this session, check it.
 3. Set the task to `done` **only** if every check passed. Otherwise leave a
    handoff per `spec/TASK_TEMPLATE.md` and say plainly it is incomplete.
 4. Add a changelog one-liner to `.changelog/UNRELEASED.md` under the right
-   section (`db/`, `handlers/`, `sync/`, `schema/`), per `CLAUDE.md:140-151`.
+   section (`db/`, `handlers/`, `sync/`, `schema/`), per `CLAUDE.md` →
+   Changelog Maintenance.
 5. Update `spec/STATE.md`.
 6. Commit as `<task-id>: <outcome>`, and push to the Forgejo `origin` —
    pushing is authorized for Nisaba work (Bobby, 2026-09-16; see Decision
@@ -86,17 +87,23 @@ Test: could a different model, reading only these files, resume exactly here?
 
 ## Tripwires — stop or flag on sight
 
+Sources cite a file plus a section name rather than a line number: `CLAUDE.md`
+grows every round, and a line number that has drifted is worse than none.
+
 | Tripwire | Why | Source |
 |---|---|---|
-| About to remove or raise `sqlDB.SetMaxOpenConns(1)` | SQLite is single-writer; more connections cause `SQLITE_BUSY` even in WAL mode | `CLAUDE.md:88-89` |
-| About to write a migration that DROPs, renames, or updates existing rows | Migrations are additive and idempotent only | `CLAUDE.md:91-92` |
-| About to reach for `ssh -t` because "`sudo` needs a TTY" | It does not here: `sudo` is passwordless for `truenas_admin`, and a plain `ssh host "bash deploy.sh"` ran clean for `DEPLOY-001` (2026-09-16) | `CLAUDE.md:94-95`, verified live |
-| About to rsync without `--exclude='._*'` | macOS resource forks pollute the server | `CLAUDE.md:103-104` |
-| About to render a secret as `value=` in HTML | Use a boolean `FooSet bool` and placeholder text | `CLAUDE.md:135` |
+| About to remove or raise `sqlDB.SetMaxOpenConns(1)` | SQLite is single-writer; more connections cause `SQLITE_BUSY` even in WAL mode | `CLAUDE.md` → Critical Constraints → SQLite single-writer |
+| About to write a migration that DROPs, renames, or updates existing rows | Migrations are additive and idempotent only | `CLAUDE.md` → Critical Constraints → Additive migrations only |
+| About to reach for `ssh -t` because "`sudo` needs a TTY" | It does not here: `sudo` is passwordless for `truenas_admin`, and a plain `ssh host "bash deploy.sh"` ran clean for `DEPLOY-001` (2026-09-16) | `CLAUDE.md` → SSH & Deployment Workflow, verified live |
+| About to rsync without `--exclude='._*'` | macOS resource forks pollute the server | `CLAUDE.md` → Critical Constraints → `._*` macOS resource forks |
+| About to render a secret as `value=` in HTML | Use a boolean `FooSet bool` and placeholder text | `CLAUDE.md` → Coding Conventions |
+| About to deploy without checking the server tree first | The rsync has no `--delete`, and `deploy.sh` kills the container *before* building, so a stale deleted file is an outage rather than a failed deploy | `CLAUDE.md` → Deploy loop; `DEPLOY-004` |
+| About to claim a feature works because its code exists | The Steam Deck, ProtonDB and Steam cross-ref fetchers in `sync/` have no caller — nothing refreshes those columns | `spec/OPEN.md`, measured 2026-09-17 |
+| About to label a `sync_log` type by hand | `sync_log.type` has a CHECK; an unlisted value fails the INSERT, leaves `logID` 0 and silently discards the whole run and its errors | `schema.sql`, `GOGL-007` |
 | About to deploy as part of an implementation task | Deployment is always its own `atlas` task and stops for Bobby | Bobby, 2026-08-01 |
 | About to write a performance fix before the cause is isolated | The 2026-06-28 pass optimized on a hypothesis and the page is still 5.3s | `spec/PRODUCT.md`, ordering rule |
-| About to add a query to `queries/*.sql` or run sqlc | That scaffolding is being deleted; `db/store.go` is the only query source | Bobby, 2026-08-01 |
-| About to add comments or docstrings to code you did not change | Explicit house convention | `CLAUDE.md:131-136` |
+| About to add a query to `queries/*.sql` or run sqlc | That scaffolding is deleted (`BASE-002`); `db/store.go` is the only query source | Bobby, 2026-08-01 |
+| About to add comments or docstrings to code you did not change | Explicit house convention | `CLAUDE.md` → Coding Conventions |
 | About to derive work from `spec/OPEN.md` | Nothing in it is ruled. It is not a requirement | `spec/OPEN.md` |
 
 ## Decision rights

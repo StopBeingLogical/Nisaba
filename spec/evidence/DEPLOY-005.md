@@ -84,3 +84,56 @@ and the script is on the Sync page.
 
 Still scheduled rather than observed: the first GOG library sync and first
 price-only run, both at `2026-09-17 11:00` UTC.
+
+## Observed 2026-09-17 21:1x UTC — the first scheduled runs
+
+Both jobs fired at the first window after the deploy, and both are the only
+`sync_log` rows of their type at that time:
+
+| id | type | status | added | updated | started | finished |
+|---:|---|---|---:|---:|---|---|
+| 87 | `pricing` | done | 0 | 539 | 11:00:00 | 11:00:53 |
+| 88 | `ownership` | done | **3** | 0 | 11:00:00 | 11:01:02 |
+
+No `error_message` on either. Row 88 is the prediction in `GOGL-001` and
+`GOGL-003` landing exactly: **3 games added**, the three the library view held
+and the database did not, in 62 seconds.
+
+Data afterward, against what `GOGL-003` predicted from the scratch database:
+
+| | before | after | `GOGL-003` prediction |
+|---|---:|---:|---:|
+| `game_stores` `store='gog'` | 1037 | **1040** | 1040 |
+| …with a non-empty `store_url` | 0 | **992** | 992 |
+| `wishlist_entries` `id LIKE 'gog-wish-%'` | 0 | **0** | 0 |
+
+So GOG's own canonical deal links now populate a store that had never carried
+one, exactly the 992 of 1040 GOG products whose payload has a `url`.
+
+### The retired path stayed retired under a Full sync
+
+A **Full sync ran at 20:47:24 on this binary** (id 89, done, 677 added, 543
+updated, no error) and the GOG wishlist count is still **0** and the GOG store
+rows are still 1040. This replaces the earlier reasoning-by-construction: the
+writer is not merely absent from the new binary, its replacement has now been
+exercised against the live database without recreating a single `gog-wish-` row.
+Wishlist moved 672 → 676 across the round, all Steam.
+
+### `gog.client_secret` is still unset, and the fallback is what ran
+
+`app_config` holds `gog.access_token`, `gog.access_token_expires`,
+`gog.refresh_token`, `sync.api_secret` and `sync.price_hour` — **no
+`gog.client_secret`**. Row 88 therefore ran on the documented fallback: the
+refresh could not be attempted, and GOG accepted the stored access token whose
+recorded expiry passed in March. That is the reprieve `GOGL-002` records, and it
+is still open — the day GOG stops honouring that token the GOG sync fails until
+the secret is set in Settings. The secret is the public Galaxy constant in
+Heroic's `gogdl`; nothing on Praxis holds it, so this is a paste, not a machine.
+
+### One action the deploy did not perform for Bobby
+
+`GOGL-006` is in the served template, so the Sync page now hands out a script
+that skips GOG — but only someone who **re-copies the script** gets it. Whatever
+copy is configured on the Windows side is the old one and will keep posting GOG
+until it is replaced. No Playnite run has happened since the deploy, so this is
+untested in the live system rather than broken.

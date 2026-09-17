@@ -7,7 +7,9 @@ Store syncing, enrichment, pricing integrations, and data imports.
 ## [Unreleased]
 
 ### Status
-- No pending changes
+- Pending `sync/` entries live in `.changelog/UNRELEASED.md` until they are
+  consolidated here; as of 2026-09-17 that includes the GOG auth and library
+  files, the daily scheduler, and the bulk ITAD ID lookup.
 
 ---
 
@@ -38,44 +40,71 @@ Store syncing, enrichment, pricing integrations, and data imports.
 ---
 
 ## Sync Pipeline Files
-- `steam.go` — Steam library ownership
-- `igdb.go` — IGDB enrichment (batched 10/req)
-- `rawg.go` — RAWG fallback enrichment
-- `wishlist.go` — Steam wishlist sync (3-stage name resolution)
-- `gog_wishlist.go` — GOG wishlist sync + OAuth
-- `ggdeals.go` — gg.deals pricing API
+
+Verified against the directory 2026-09-17.
+
+**Ownership**
+- `steam.go` — Steam library ownership (Steam Web API)
+- `gog_auth.go` — GOG access token refresh (`gog.client_secret`); no expiry gate
+- `gog_library.go` — GOG library sync from the library view, 11 requests/day
+- `heroic.go` — Heroic library file import (Epic, GOG, Amazon). **Dead: no route
+  mounts it** (`handlers/sync.go`, ruled out of scope in `PRODUCT-3.md`)
+- `wishlist.go` — Steam wishlist sync (3-stage name resolution). Steam only; the
+  GOG wishlist is retired and its file deleted
+
+**Pricing**
+- `itad.go` — IsThereAnyDeal. Authoritative for price, storefront and history;
+  IDs resolve in bulk, 100 Steam App IDs per request
+- `ggdeals.go` — gg.deals comparison prices only (`gg_deals_*`), never the ITAD
+  columns
 - `resellers.go` — instant-gaming + loaded.com concurrent scraping
 - `allkeyshop.go` — Allkeyshop fallback (utls, Akamai evasion)
 - `chromeclient.go` — Chrome TLS fingerprint HTTP client
-- `heroic.go` — Heroic library file import (Epic, GOG, Amazon)
-- `protondb.go` — ProtonDB compatibility ratings
-- `steam_deck.go` — Steam Deck compatibility status
+
+**Enrichment**
+- `igdb.go` — IGDB enrichment (batched 10/req) plus `SyncSteamCrossRefs`
+- `rawg.go` — RAWG fallback enrichment
+- `protondb.go` — ProtonDB ratings. **No caller** — see `spec/OPEN.md`
+- `steam_deck.go` — Steam Deck status. **No caller** — see `spec/OPEN.md`
+
+**Scheduling and mystery packs**
+- `schedule.go` — the daily price-only run and the daily GOG library run
+- `mystery_packs.go`, `mystery_packs_scrape.go` — Chrome-extension pack ingestion
+
+Removed: `gog_wishlist.go` (GOG wishlist sync + OAuth), deleted by `GOGL-004`
+when the GOG wishlist was retired.
 
 ---
 
 ## Enrichment Pipeline
 
+Ownership arrives on three paths, then enrichment runs over whatever is present:
+
 ```
-Steam ownership
-  ↓
-GOG/Epic/Amazon (Heroic)
-  ↓
-IGDB enrichment (batched)
-  ↓
-RAWG fallback
-  ↓
-Review queue (unmatched)
+Steam ownership (steam.go, Steam Web API)
+GOG library (gog_library.go, daily, server-side)   ─→ IGDB enrichment (batched)
+Playnite, all stores except GOG (HTTP POST)          ─→ RAWG fallback
+                                                     ─→ Review queue (unmatched)
 ```
+
+The Heroic file import is dead code and is not part of this flow.
 
 ## Pricing Pipeline
 
 ```
-gg.deals API (Steam-linked games, batch 100/req)
+ITAD (itad.go) — authoritative for best_current_price, best_current_store,
+                 best_price_url, historical low and wishlist_price_history
   ↓
-instant-gaming + loaded.com (concurrent, non-Steam entries)
+GG.deals (ggdeals.go) — comparison only, writes gg_deals_price / gg_deals_url;
+  a cheaper price surfaces as a wishlist callout
   ↓
-Allkeyshop (fallback, utls Akamai evasion)
+instant-gaming + loaded.com (resellers.go, concurrent, non-Steam entries)
+  ↓
+Allkeyshop (allkeyshop.go, fallback, utls Akamai evasion)
 ```
+
+Ownership, wishlist imports and enrichment are not part of the daily job — only
+the pricing columns above. The full sync stays manual.
 
 ## Wishlist Name Resolution
 

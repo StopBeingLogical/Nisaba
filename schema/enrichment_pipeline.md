@@ -1,5 +1,11 @@
 # Enrichment Pipeline
 
+> **Partly superseded — pre-implementation design doc.** Retained as history;
+> `CLAUDE.md` and the code are authoritative. The shipped enrichment entry points
+> are `EnrichLibrary` / `EnrichWishlist` (`sync/igdb.go`) with RAWG as fallback,
+> and the full sync calls them last. The Steam Deck and ProtonDB fetchers in
+> `sync/` currently have no caller — see `spec/OPEN.md`.
+
 All phases run in a single pass on manual sync trigger. Progress is shown per phase.
 
 ---
@@ -164,7 +170,7 @@ IGDB queries are batched (10 games per request) to reduce Phase 1 to under 1 min
 Runs on demand. Only processes:
 - New games not yet in the DB → full pipeline
 - All games → ITAD pricing refresh (Phase 3 pricing only)
-- Wishlist → fetch Steam + GOG wishlist updates
+- Wishlist → fetch Steam wishlist updates (the GOG wishlist is retired)
 
 Skips metadata re-enrichment for already-enriched games.
 Uses `last_enriched` to determine what is new.
@@ -179,4 +185,4 @@ Uses `last_enriched` to determine what is new.
 | RAWG     | 20,000 requests/month    | Only called for IGDB misses    |
 | Steam    | 100,000 requests/24hr    | Cross-reference only           |
 | ProtonDB | No official API          | Scraped — rate limit unknown   |
-| ITAD     | Free tier limits apply   | 1 call per game for pricing    |
+| ITAD     | 100 requests / 5 min (this key) | Bulk: 100 Steam App IDs per lookup request, so the whole wishlist is ~11 requests, not one per game |

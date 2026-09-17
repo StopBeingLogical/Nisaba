@@ -6,6 +6,21 @@ deleted.
 
 ## Awaiting a ruling
 
+- **Should the Steam Deck, ProtonDB and Steam cross-ref fetchers be wired back
+  up, or deleted?** Measured 2026-09-17: `SyncSteamDeckStatus`
+  (`sync/steam_deck.go:25`), `SyncProtonRatings` (`sync/protondb.go:24`) and
+  `SyncSteamCrossRefs` (`sync/igdb.go:253`) have **no caller anywhere in the
+  repository** — a `grep` for `SyncSteamDeckStatus(`, `SyncProtonRatings(` and
+  `SyncSteamCrossRefs(` across every `*.go` file matches only their definitions.
+  The store methods they use (`SetSteamDeckVerified`, `SetWishlistDeckVerified`,
+  `SetProtonRating`) and the columns they fill are live, and the library grid and
+  filters still read them: the live database holds 1779 games with
+  `steam_deck_verified` and 826 with `proton_rating`, all from before the 2026-06-28
+  sync-page cleanup. So the data is displayed and stale rather than absent —
+  `README.md` advertised both as working features until this was measured. The
+  full sync never called them. Options I can see, not a recommendation: (a) call
+  them from the daily or full sync again; (b) leave them dormant and say so in
+  `README.md`; (c) delete the three files. Not derived into a task.
 - **Should the deploy rsync use `--delete`?** The documented command
   (`CLAUDE.md`) has no `--delete`, so the deployed tree keeps files the
   repository has deleted. `DEPLOY-004` hit this: the deleted
@@ -28,15 +43,10 @@ deleted.
 
 ## Model inferences, unratified
 
-- **The library fix may need a query-shape or schema change rather than an
-  index.** Basis: the 2026-06-28 pass already added five indexes and pagination
-  (`CLAUDE.md:161-162`) and the page still serves in 5.34s. Not locked —
-  `PERF-002` decides on measurements, and `PERF-003` puts the approach to
-  Bobby before any fix is written.
-
-- **ITAD is the likely GG.deals answer.** Basis: `sync/itad.go` already exists
-  and `CLAUDE.md:191` notes it "would provide real store names." Not locked;
-  `GG-001` may find it needs a paid or approved key.
+Both original entries here are settled and were deleted, per this file's own
+rule: the library fix landed as a query-shape change (`PERF-004` → `PERF-007`,
+page 1 5.63s → 0.081s live), and ITAD was adopted as the pricing provider
+(`PRODUCT.md`, `GG-002`).
 
 ## Resolved
 
@@ -58,8 +68,9 @@ deleted.
   strength of `shop.name`; GG.deals' store breadth is moot without shop names. An
   alternative may displace it only if measured to supply real storefront names.
   Moved to `PRODUCT.md`; executed by `GG-002`. (An unsearched candidate remains
-  `CLAUDE.md:169`'s "scrape the page", and `GG-001` could not verify whether
-  another GG.deals endpoint carries per-shop data.)
+  the "scrape the page" option `CLAUDE.md` → Recent Session Context records, and
+  `GG-001` could not verify whether another GG.deals endpoint carries per-shop
+  data.)
 - **May `sync_log` be rebuilt so its `type` constraint matches the code?** →
   ruled 2026-09-16: **no rebuild; log Playnite runs as type `ownership`.**
   `sync_log.type` allows only `('full', 'ownership', 'install', 'pricing',

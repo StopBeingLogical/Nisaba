@@ -49,14 +49,23 @@ HTTP handlers and user-facing features.
 ---
 
 ## Handler Files
+
+Verified against the directory 2026-09-17.
+
 - `handlers.go` — Router, TemplateFuncMap, render helpers
+- `auth.go` — Session login, password check, logout
 - `dashboard.go` — `/` dashboard
-- `library.go` — `/library`, `/library/{id}` (owned games)
-- `wishlist.go` — `/wishlist`, `/wishlist/{id}` (wishlists)
-- `sync.go` — `/sync` endpoints (trigger + status polling)
+- `library.go` — `/library`, `/library/search`, `/library/{id}` (owned games)
+- `wishlist.go` — `/wishlist`, `/wishlist/{id}` (Steam wishlist)
+- `sync.go` — `/sync` endpoints (trigger + status polling) and
+  `POST /api/sync/playnite`; owns the `SyncAll` sequence
 - `enrichment.go` — `/review` IGDB match queue
 - `settings.go` — `/settings` configuration
-- `gog_auth.go` — `/auth/gog` token handling
+- `gog_auth.go` — `/auth/gog` token handling (the push that seeds
+  `gog.refresh_token`)
+- `mystery_packs.go` — `/mystery-packs` pages, Chrome-extension install page
+- `mystery_packs_api.go` — the four `/api/mystery-packs/*` endpoints. Mounted
+  **outside the auth group** by design ("no auth, raw data only")
 - `logbuffer.go` — Log capture + ring buffer
 - `logs.go` — `/logs` console viewer
 - `imgproxy.go` — `/img/proxy` image caching

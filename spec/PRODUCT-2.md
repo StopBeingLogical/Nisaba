@@ -41,6 +41,10 @@ one-liners, deployment always its own `atlas` task that stops for confirmation.
 - **The GOG wishlist token is expired** (`re-paste auth.json in Settings`,
   logged on every full sync since at least run 86 on 2026-09-17). Bobby deferred
   it on 2026-09-16; the GOG wishlist is skipped silently until he re-pastes it.
+  **Superseded by `PRODUCT-3.md` (2026-09-16):** the GOG wishlist is retired
+  rather than re-authorised, its 58 rows are deleted, and the stored token now
+  serves the server-side GOG library sync, which refreshes it itself. The expiry
+  gate described here no longer exists (`PRODUCT-3.md`, `GOGL-002`).
 - **The 133 unpriced Steam entries are not a defect.** Sampled 60 deep:
   25 not released yet, 31 with no release date in ITAD at all, 4 released with no
   deal in US, DE or GB, and an independent endpoint (`POST /games/prices/v3`)

@@ -1,5 +1,11 @@
 # Data Relationships
 
+> **Partly superseded — pre-implementation design doc.** The TypeScript files in
+> the index at the bottom (`game_library.ts`, `wishlist.ts`, …) were never created;
+> the shipped types are Go structs in `db/models.go` against the tables in
+> `schema.sql`. The entity map below is still the right mental model, and the
+> AppConfig table is kept current.
+
 ## Entity Map
 
 ```
@@ -94,13 +100,19 @@ credentials and settings consumed by every pipeline operation:
 
 | AppConfig field     | Used by                              |
 |---------------------|--------------------------------------|
-| `steam.api_key`     | Ownership sync, wishlist sync        |
-| `steam.steam_id`    | Ownership sync, wishlist sync        |
-| `gog.*`             | Ownership sync, wishlist sync        |
+| `auth.password_hash`, `auth.secret`, `auth.session_hours` | Session auth |
+| `steam.api_key`     | Steam ownership sync, Steam wishlist sync |
+| `steam.user_id`     | Steam ownership sync, Steam wishlist sync |
+| `gog.refresh_token`, `gog.access_token`, `gog.access_token_expires`, `gog.client_secret` | GOG library sync only — the wishlist no longer reads these |
 | `igdb.*`            | Enrichment pipeline (Phase 1–2)      |
 | `rawg.api_key`      | Enrichment pipeline (Phase 1–2)      |
-| `itad.api_key`      | Enrichment pipeline (Phase 3), pricing sync |
-| `pricing.*`         | Wishlist UI threshold indicators     |
+| `itad.api_key`      | Pricing sync — authoritative for price, storefront and history |
+| `ggdeals.api_key`   | GG.deals comparison prices only      |
+| `sync.api_secret`   | Playnite endpoint authentication     |
+| `sync.price_hour`, `sync.gog_hour` | The two daily schedules |
+
+Thresholds are **not** in AppConfig: they are rows in the `price_thresholds`
+table.
 
 ---
 
