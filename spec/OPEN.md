@@ -6,6 +6,22 @@ deleted.
 
 ## Awaiting a ruling
 
+- **Should the deploy rsync use `--delete`?** The documented command
+  (`CLAUDE.md`) has no `--delete`, so the deployed tree keeps files the
+  repository has deleted. `DEPLOY-004` hit this: the deleted
+  `sync/gog_wishlist.go` stayed on the server beside the new `sync/gog_auth.go`
+  and duplicated its `GOGClientID` constant and `gogGetAccessToken` function — a
+  build failure, and `deploy.sh` removes the container *before* it builds, so the
+  site would have gone down. It was fixed by hand for that one file. Still stale
+  in `/mnt/MemoryAlpha/nisaba/source/`: `queries/`, `sqlc.yaml` (both deleted by
+  `BASE-002`) and an `enrichment/` directory the repository does not contain. All
+  inert today — only `templates/*`, `static/*` and `schema.sql` are embedded
+  (`main.go:24-30`) — but any deleted file under them that a build reaches would
+  fail the same way. Options I can see, not a recommendation: (a) add `--delete`
+  to the documented rsync (the existing `--exclude` patterns still protect `.git`,
+  `*.db` and `imgcache` from deletion); (b) keep the command as it is and remove
+  stale paths by hand at each deploy; (c) something else. Not derived into a task.
+
 - **May `sync_log` be rebuilt so its `type` constraint matches the code?**
   `sync_log.type` allows only `('full', 'ownership', 'install', 'pricing',
   'wishlist', 'rehydrate')` (`schema.sql:265`), but the code logs

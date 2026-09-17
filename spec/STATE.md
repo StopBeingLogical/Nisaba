@@ -143,11 +143,34 @@ too. Backups of all three row sets are on Ergaster under `/tmp/gog005-backup-*`
 Full sync still recreates those entries — the DELETE is idempotent, but the rows
 come back until `DEPLOY-004` replaces the writer.
 
+**`DEPLOY-004` completed 2026-09-16** (commit `8e33a46`, image
+`d0c5bc6d`). The deployed container logs both schedules, and the GOG one is new
+— the proof the round is live:
+
+```
+price sync: next run 2026-09-17 11:00
+ gog library sync: next run 2026-09-17 11:00
+```
+
+Routes 200, wishlist still 672 with no GOG entries, `game_stores` gog rows 1037,
+nothing mid-sync (`evidence/DEPLOY-004.md`). One near-miss: the deleted
+`sync/gog_wishlist.go` was still on the server because the documented rsync uses
+no `--delete`, and it would have failed the build after `deploy.sh` had already
+removed the container. Removed by hand; the wider tree drift is in `OPEN.md`.
+
 ## Next task
 
-`DEPLOY-004` — deploy the GOG round (`ready`; needs `atlas` and Bobby's
-confirmation). **Set `gog.client_secret` in Settings immediately after**, or the
-new library sync skips: the live config does not have it yet.
+None. The round is complete and deployed. Two things are **scheduled or pending
+rather than observed**:
+
+- **The first runs at 2026-09-17 11:00 UTC.** Watch for a `sync_log` row with
+  `type='ownership'`, and expect `games_added` 3 for the GOG library.
+- **`gog.client_secret` is not set in the live config.** The first run will try
+  to refresh, fail with "GOG client secret is not set", and fall back to the
+  stored token, which GOG still accepts — so the run should still succeed, but
+  the fallback only holds while GOG keeps honouring that token. Set the secret
+  in Settings; it is the public Galaxy constant published in Heroic's `gogdl`,
+  not something Praxis holds.
 
 The round that preceded this one is **deployed and verified** (`DEPLOY-003`):
 the live container reports its next price window as `2026-09-17 11:00` UTC, and
