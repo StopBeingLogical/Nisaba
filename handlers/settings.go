@@ -22,6 +22,7 @@ type AppConfig struct {
 	ITADAPIKeySet       bool
 	SyncAPIKeySet       bool
 	GOGRefreshTokenSet  bool
+	GOGClientSecretSet  bool
 	GOGTokenStatus      string // "valid", "expired", or ""
 	GOGTokenExpiry      string // human-readable expiry time
 	HeroicLibraryPath   string
@@ -56,6 +57,7 @@ func (h *Handler) Settings(w http.ResponseWriter, r *http.Request) {
 		ITADAPIKeySet:       cfg["itad.api_key"] != "",
 		SyncAPIKeySet:       cfg["sync.api_secret"] != "",
 		GOGRefreshTokenSet:  cfg["gog.refresh_token"] != "",
+		GOGClientSecretSet:  cfg["gog.client_secret"] != "",
 		HeroicLibraryPath:   orDefault(cfg["heroic.library_path"], "./store_library_files"),
 		SessionHours:        orDefault(cfg["auth.session_hours"], "12"),
 		PasswordSet:         cfg["auth.password_hash"] != "",
@@ -104,6 +106,7 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 		{"itad_api_key", "itad.api_key"},
 		{"sync_api_secret", "sync.api_secret"},
 		{"gog_refresh_token", "gog.refresh_token"},
+		{"gog_client_secret", "gog.client_secret"},
 	} {
 		if v := r.FormValue(pair[0]); v != "" {
 			pairs[pair[1]] = v

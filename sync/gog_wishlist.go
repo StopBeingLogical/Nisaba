@@ -5,14 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"nisaba/db"
 )
-
-// GOGClientID is the GOG Galaxy public client ID.
-const GOGClientID = "46899977096215655"
 
 // SyncGOGWishlist fetches the authenticated GOG wishlist and upserts entries.
 func SyncGOGWishlist(store *db.Store) (WishlistResult, error) {
@@ -65,25 +61,6 @@ func SyncGOGWishlist(store *db.Store) (WishlistResult, error) {
 	result.Removed = removed
 
 	return result, nil
-}
-
-// gogGetAccessToken returns the stored access token if still valid.
-func gogGetAccessToken(store *db.Store) (string, error) {
-	accessToken, err := store.GetConfig("gog.access_token")
-	if err != nil || accessToken == "" {
-		return "", fmt.Errorf("GOG not configured — paste auth.json in Settings")
-	}
-
-	expiresStr, _ := store.GetConfig("gog.access_token_expires")
-	if expiresStr != "" {
-		if exp, err := strconv.ParseInt(expiresStr, 10, 64); err == nil {
-			if time.Now().Unix() >= exp {
-				return "", fmt.Errorf("GOG access token expired — re-paste auth.json in Settings")
-			}
-		}
-	}
-
-	return accessToken, nil
 }
 
 type gogWishlistResponse struct {

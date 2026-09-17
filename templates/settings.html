@@ -147,10 +147,19 @@
             {{ if eq .Config.GOGTokenStatus "valid" }}
             <p class="text-xs text-green-400 mb-3">✓ Token valid until {{ .Config.GOGTokenExpiry }}</p>
             {{ else if eq .Config.GOGTokenStatus "expired" }}
-            <p class="text-xs text-red-400 mb-3">⚠ Token expired (was valid until {{ .Config.GOGTokenExpiry }}) — re-push from Steam Deck</p>
+            <p class="text-xs text-amber-400 mb-3">⚠ Past the recorded expiry ({{ .Config.GOGTokenExpiry }}) — Nisaba refreshes it on the next sync. Re-push only if that refresh is rejected.</p>
             {{ else }}
             <p class="text-xs text-gray-500 mb-3">Not configured.</p>
             {{ end }}
+
+            <!-- Client secret (needed for automatic refresh) -->
+            <div class="mb-4">
+                <label class="filter-heading">Client Secret</label>
+                <input type="password" name="gog_client_secret"
+                    placeholder="{{ if .Config.GOGClientSecretSet }}(saved — leave blank to keep){{ else }}GOG Galaxy client secret{{ end }}"
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+                <p class="text-xs text-gray-600 mt-1">Lets Nisaba refresh the token itself. It is the public Galaxy client secret carried by Heroic and gogdl; paste it once.</p>
+            </div>
 
             <!-- Curl push (recommended) -->
             <p class="filter-heading mb-1">Push from Steam Deck (recommended)</p>
