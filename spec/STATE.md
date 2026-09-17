@@ -123,10 +123,17 @@ the database: run one added the 3 missing games (1037 → 1040), run two added
 nothing, 0 errors (`evidence/GOGL-003.md`). It logs as `sync_log` type
 `ownership`, so it shows in Recent Activity. Not yet deployed.
 
+**`GOGL-004` landed 2026-09-16.** The GOG wishlist step is out of the full sync
+and `sync/gog_wishlist.go` is deleted — its only caller was that step. The auth
+path (push, paste, the three config keys) stays, because the library sync
+authenticates with it, and the store methods it used are still live for the
+Steam wishlist (`evidence/GOGL-004.md`).
+
 ## Next task
 
-`GOGL-004` — retire the GOG wishlist pass (`ready`; needs `local`). `GOGL-005`
-(the deletion, Bobby's to run) and `DEPLOY-004` stay `blocked` behind it.
+`GOGL-005` — delete the 58 stale `gog-wish-` entries (`ready`; needs `atlas` and
+your hand, since it is a deletion against the live database). Then `DEPLOY-004`
+puts the round on Atlas.
 
 The round that preceded this one is **deployed and verified** (`DEPLOY-003`):
 the live container reports its next price window as `2026-09-17 11:00` UTC, and

@@ -105,7 +105,7 @@ func (h *Handler) SyncAll(w http.ResponseWriter, r *http.Request) {
 			log.Printf("sync-all ownership: %s", e)
 		}
 
-		// 2. Wishlist (Steam + GOG)
+		// 2. Wishlist (Steam is the only wishlist source)
 		log.Printf("sync-all: step — Steam wishlist")
 		setStep("Syncing Steam wishlist…")
 		wlResult, err := storesync.SyncSteamWishlist(h.store)
@@ -118,19 +118,6 @@ func (h *Handler) SyncAll(w http.ResponseWriter, r *http.Request) {
 		log.Printf("sync-all: Steam wishlist done — %d entries, %d errors", wlResult.Added, len(wlResult.Errors))
 		for _, e := range wlResult.Errors {
 			log.Printf("sync-all wishlist: %s", e)
-		}
-
-		log.Printf("sync-all: step — GOG wishlist")
-		setStep("Syncing GOG wishlist…")
-		gogResult, gogErr := storesync.SyncGOGWishlist(h.store)
-		if gogErr != nil {
-			log.Printf("sync-all: GOG wishlist skipped: %v", gogErr)
-		} else {
-			log.Printf("sync-all: GOG wishlist done — %d entries, %d errors", gogResult.Added, len(gogResult.Errors))
-			for _, e := range gogResult.Errors {
-				log.Printf("sync-all gog wishlist: %s", e)
-			}
-			wlResult.Added += gogResult.Added
 		}
 
 		h.cleanupWishlistLinks()

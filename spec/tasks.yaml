@@ -287,7 +287,7 @@ tasks:
 
   - id: GOGL-004
     title: Retire the GOG wishlist pass
-    status: ready
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [GOGL-002]
@@ -297,7 +297,7 @@ tasks:
 
   - id: GOGL-005
     title: Delete the stale GOG wishlist entries
-    status: blocked
+    status: ready
     capability: human
     environment: [atlas]
     depends_on: [GOGL-004]

@@ -39,6 +39,7 @@
 - Added migration: price_thresholds table with 4 seeded default rows (2026-06-28)
 
 ## handlers/ Changes
+- The full sync no longer runs a GOG wishlist pass — Steam is the only wishlist source, and the GOG settings card now documents itself as the library's credentials (2026-09-16)
 - Wishlist views show the GG.deals price where ITAD has no price, labelled GG.deals, instead of "no pricing data" (2026-09-16)
 - `storeShortLabel` maps ITAD storefront names (Humble Store → Humble, Epic Game Store → Epic, GreenManGaming → Green Man Gaming, Blizzard → Battle.net) and falls back to the raw value, never blank (2026-09-16)
 - Full sync now runs ITAD as the authoritative pricing step, then GG.deals as a comparison step; an unconfigured ITAD key logs and continues instead of failing the run (2026-09-16)
@@ -58,6 +59,7 @@
 - Added 3 lowest prices display to wishlist detail page (2026-06-28)
 
 ## sync/ Changes
+- Removed `sync/gog_wishlist.go` — the retired GOG wishlist pass (2026-09-16)
 - Added `sync/gog_library.go` — the GOG library syncs itself once a day (`sync.gog_hour`, default 11 = 07:00 US Eastern) from the library view, 11 requests for the whole account, in its own window so the price run stays price-only (2026-09-16)
 - Added `sync/gog_auth.go` — GOG access tokens now refresh themselves from the stored refresh token (`gog.client_secret`), replacing the expiry check that rejected tokens GOG still accepts (2026-09-16)
 - Added `sync/schedule.go` — a daily price-only sync (`sync.price_hour`, default 11 = 07:00 US Eastern) that skips while another sync runs, skips without an ITAD key, and catches up after downtime (2026-09-16)
