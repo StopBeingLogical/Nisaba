@@ -18,6 +18,12 @@ reported missing cover art: `WISH-001` wired the orphaned wishlist enrichment
 back in, and `DEPLOY-006` deployed it and backfilled the live database —
 wishlist cover coverage went **41% → 92%**. Both are `done`.
 
+A **data audit and cleanup round opened and closed 2026-09-17** (`PRODUCT-5.md`):
+`AUDIT-001` measured every anomaly from a read-only copy, then `DATA-001`..`003`
+and `DEPLOY-007` cleaned it. The library went from **4101 tiles to 3390 games**,
+the multiple-stores flag from 796 wrong to **243 right**, and the database is
+clear of duplicates, reference links and stale errors. See below.
+
 `OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
 rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
 should use `--delete`, and the three dormant fetchers (`SyncSteamDeckStatus`,
@@ -245,9 +251,56 @@ and the rendered page returns exactly those numbers. `PRAGMA quick_check` is
 fields are on Ergaster, and the temporary runner was deleted from Atlas and
 never committed.
 
+## Data audit and cleanup round (2026-09-17) — complete
+
+Bobby asked for *"a full audit and clean up of the data"*. `AUDIT-001`
+(`evidence/AUDIT-001.md`) took a `.backup` copy and measured everything with no
+write to production, including what was clean: `integrity_check` `ok`, no
+foreign-key violations, and no out-of-range value anywhere.
+
+**The headline was duplication, not corruption.** 4101 rows held 3383 games.
+549 of the duplicates had no store link at all and were created on
+**2026-04-27**, during the Playnite rollout before title deduplication worked.
+`ListGames` joins `game_stores` only for a store *filter*, so all of them were
+being listed.
+
+**The finding that ordered the work:** `multi_store_owned` asked whether another
+*row* shared the `igdb_id`, not whether the game was owned on more than one
+store — **796 games flagged where 102 were**. The duplicate rows were
+load-bearing for that flag, so `PRODUCT-5.md` mandated the order: correct the
+query, deploy it, then dedupe.
+
+- **`DATA-001`** — the flag now counts owned store links, served by
+  `idx_game_stores_game_id_owned` as a covering index. 796 → 102 measured with
+  the shipped expression.
+- **`DEPLOY-007`** — live, image `107c7ed2546b`. **The page proves which
+expression it runs**: 5 purple dots rendered against 31 for the old test and 5
+for the new one. `/library` page 1 in 0.070s, `page=10` in 0.090s.
+- **`DATA-002`** — 711 rows merged and deleted: **4101 → 3390 games, 549 → 0
+  without a store link, 477 → 418 with playtime**, and **all 4294 distinct
+  `(store, store_id)` identifiers preserved** with every DLC row intact. Seven
+  groups were left alone, because `game_stores` holds one link per store per
+  game and merging them would discard an identifier — including
+  `steam/3286930`, which resolves to **"Heretic + Hexen"**, a different product
+  stored under Heretic's title.
+- **`DATA-003`** — 3 mojibake and 12 whitespace titles repaired with their
+  `sort_title` rebuilt by the same rule as `makeSortTitle`, 1 sentinel date
+  nulled, 653 unread reference links deleted, 131 stale ProtonDB errors cleared.
+
+**A dry-run bug worth remembering:** the first merge used a correlated subquery
+against `games` *inside* an `UPDATE` of `games`, which SQLite does not bind to
+the row being updated. A minimal reproduction caught a survivor inheriting an
+unrelated group's playtime; on the full copy it inflated games-with-playtime
+from 477 to 645. Precomputing the merge values fixed it. On live that version
+would have written wrong data.
+
+**Left alone by ruling:** the **124 Steam Family Sharing games**, which are
+games Bobby does not own and still render with a badge. Recorded in
+`PRODUCT-5.md` as an unruled question, not actioned.
+
 ## Next task
 
-None — `DEPLOY-006` closed the wishlist round on 2026-09-17, and
+None — `DEPLOY-007` closed the data round on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
 **One observation is still outstanding, and it is the only gap in the round.**
@@ -306,7 +359,9 @@ now exercised on the deployed build, and it logged to `sync_log` as expected.
 ## Blockers
 
 None. `OPEN.md` holds three unanswered entries, but nothing derives work from
-them, no task is blocked, and the deployed instance is healthy.
+them, no task is blocked, and the deployed instance is healthy. The live database
+passed `quick_check` and `foreign_key_check` after every write in the data
+round, and holds no duplicates, no reference-only links and no stale errors.
 
 Reference facts a future session should not have to re-derive:
 

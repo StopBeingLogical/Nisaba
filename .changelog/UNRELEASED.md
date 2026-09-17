@@ -9,6 +9,7 @@
 ---
 
 ## Top-Level Changes (Major only)
+- The library holds 3390 games rather than 4101: 711 duplicate rows created by the Playnite rollout in April were merged into their originals and deleted, leaving nothing without a store link. Duplicate titles (Dragon Age: Origins ×8, Fallout 2 ×5) now appear once (2026-09-17)
 - Playnite is no longer the GOG owner: the embedded script skips `gog` entries (the server syncs GOG itself), while every other store keeps arriving through it, and Playnite runs are now visible in Recent Activity (2026-09-16)
 - Prices now refresh themselves once a day — a price-only scheduled sync (ITAD + GG.deals, ~8s) with the full sync left manual at ~15 minutes (2026-09-16)
 - Switched the pricing provider to ITAD so `best_current_store` and price history hold real storefront names; GG.deals is kept as a comparison source and feeds a "cheaper on GG.deals" callout (2026-09-16)

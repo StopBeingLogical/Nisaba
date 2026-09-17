@@ -359,7 +359,7 @@ tasks:
 
   - id: DEPLOY-007
     title: Deploy the corrected multiple-stores indicator
-    status: ready
+    status: done
     capability: human
     environment: [atlas]
     depends_on: [DATA-001]
@@ -369,7 +369,7 @@ tasks:
 
   - id: DATA-002
     title: Merge and delete the duplicate game rows
-    status: blocked
+    status: done
     capability: human
     environment: [atlas]
     depends_on: [DEPLOY-007]
@@ -379,7 +379,7 @@ tasks:
 
   - id: DATA-003
     title: Repair the remaining data debris
-    status: blocked
+    status: done
     capability: human
     environment: [atlas]
     depends_on: [AUDIT-001]
