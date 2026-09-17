@@ -73,11 +73,14 @@ punctuation: *Baldur's Gate 3*, *Divinity: Original Sin 2 - Definitive Edition*,
 `PRODUCT-4.md` before the change was written. The manual cover field on the
 wishlist detail page remains the correction path.
 
-**One incidental finding, recorded not fixed:** two wishlist titles are stored
-HTML-escaped — `Deck &amp; Conn` and `Dungeons &amp; Degenerate Gamblers`. The
-entity guarantees a match failure, since IGDB has neither string. Only 2 rows
-carry one and the `games` table has none, so this is a wishlist-writer quirk
-rather than a systemic encoding problem. It is not derived into a task.
+**One incidental finding, recorded not fixed:** three live wishlist titles are
+stored HTML-escaped — `steam-wish-3828500` `Deck &amp; Conn`,
+`steam-wish-2400510` `Dungeons &amp; Degenerate Gamblers` and
+`steam-wish-1836560` `Aether &amp; Iron`. (The 2026-09-16 copy used for the
+functional run has only the first two; the third confirms the check on live, not
+on the copy.) The entity guarantees a match failure, since IGDB has neither
+string. No `games` row carries one, so this is a wishlist-writer quirk rather
+than a systemic encoding problem. It is not derived into a task.
 
 ## Live expectation for DEPLOY-006
 

@@ -359,7 +359,7 @@ tasks:
 
   - id: DEPLOY-006
     title: Deploy the wishlist enrichment and backfill
-    status: ready
+    status: done
     capability: human
     environment: [atlas]
     depends_on: [WISH-001]

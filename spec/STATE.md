@@ -13,8 +13,10 @@ The follow-up round closed with `DEPLOY-003`. The **GOG round (below) opened,
 ran as `GOGL-001`…`GOGL-007`, and closed with `DEPLOY-005`** — its only remaining
 tasks are two Bobby-side actions listed under *Next task*.
 
-A **wishlist round opened 2026-09-17** (`PRODUCT-4.md`) after Bobby reported
-missing cover art. `WISH-001` is done and `DEPLOY-006` is the ready task.
+A **wishlist round opened and closed 2026-09-17** (`PRODUCT-4.md`) after Bobby
+reported missing cover art: `WISH-001` wired the orphaned wishlist enrichment
+back in, and `DEPLOY-006` deployed it and backfilled the live database —
+wishlist cover coverage went **41% → 92%**. Both are `done`.
 
 `OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
 rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
@@ -229,15 +231,34 @@ entries; the copy's 83.5% match rate projects to roughly **610 of 676 with art**
 `DEPLOY-006` records the actual numbers.
 
 Two things are named and accepted rather than solved: `bestMatch` is title
-matching and misses edition suffixes (`Baldur's Gate 3`, *Divinity: Original Sin
-2 - Definitive Edition*), leaving ~55 unmatched with the manual cover field as
-the correction path; and the retry cost is real on the first run but falls away,
-because later runs see only entries the Steam sync just added.
+matching and misses some titles (`Baldur's Gate 3`, *Darkest Dungeon® II*),
+leaving 53 unmatched with the manual cover field as the correction path; and the
+retry cost is real on the first run but falls away, because later runs see only
+entries the Steam sync just added.
+
+**`DEPLOY-006` completed 2026-09-17** (`1ad613f`, image `0f0208ad7d11`). The
+wishlist went from **280 to 622 of 676 entries with a cover** — 396 placeholders
+down to **54** — by matching **343 of 396** in about 100 seconds with 0 errors,
+and the rendered page returns exactly those numbers. `PRAGMA quick_check` is
+`ok`, all 622 covers are IGDB-sourced, 10 of 10 sampled URLs resolve, and
+`games` is untouched at 4101. Backups of the table and of the 396 rows' changed
+fields are on Ergaster, and the temporary runner was deleted from Atlas and
+never committed.
 
 ## Next task
 
-`DEPLOY-006` — deploy the wishlist enrichment and run a Full sync to backfill.
-`scripts/spec-next.sh local,atlas,network` prints exactly that and nothing else.
+None — `DEPLOY-006` closed the wishlist round on 2026-09-17, and
+`scripts/spec-next.sh local,atlas,network` prints nothing.
+
+**One observation is still outstanding, and it is the only gap in the round.**
+The backfill was run **out-of-band** on Bobby's choice, calling `EnrichWishlist`
+directly against the live database — because `/sync/all` sits behind session
+auth with no secret-based trigger and the binary has no sync CLI. So the
+function and the live result are proven, and **the `WISH-001` wiring is not**:
+nothing has yet run the new step inside the container. The first Full sync is
+the only thing that can, and it should log `sync-all: step — IGDB wishlist
+enrichment` and a `wishlist enriched N/M` summary. Watch for that line
+(`evidence/DEPLOY-006.md`).
 
 **Both scheduled runs fired on 2026-09-17 and were observed**, exactly as
 predicted — `sync_log` id 87 `pricing` (539 updated) and id 88 `ownership`
