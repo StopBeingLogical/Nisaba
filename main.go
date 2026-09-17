@@ -87,8 +87,10 @@ func main() {
 		log.Printf("warn: clearing allkeyshop prices: %v", err)
 	}
 
-	// Refresh prices on a daily schedule rather than only on demand.
+	// Refresh prices and the GOG library on a daily schedule rather than only
+	// on demand. The library has its own window so prices stay price-only.
 	storesync.StartDailyPriceSync(store)
+	storesync.StartDailyGOGLibrarySync(store)
 
 	h := handlers.New(store, tmplFS, handlers.TemplateFuncMap(), dataDir)
 

@@ -106,10 +106,27 @@ shape of the work:
 - The library is not short of 361 games: the 1037 `gog` rows reconcile against
   the 1040-product library view as 3 missing and 0 stale.
 
+**`GOGL-002` landed 2026-09-16.** `sync/gog_auth.go` refreshes the access token
+from the stored refresh token and writes the rotated pair back, replacing the
+expiry gate that rejected tokens GOG still accepts. The client secret lives in
+`app_config` as `gog.client_secret` (Bobby ruled it a credential after the
+`GOGL-001` finding that the token is not read-only), set once through Settings —
+so it must be set before the new sync can authenticate. Verified against the
+local database copy: token returned, access token, refresh token and expiry all
+rewritten (`evidence/GOGL-002.md`).
+
+**`GOGL-003` landed 2026-09-16.** `sync/gog_library.go` pages the library view
+(11 requests) and upserts games and gog store links; `sync/schedule.go` gained a
+daily job for it with its own window (`sync.gog_hour`, default 11) so the price
+run stays price-only, started from `main.go`. Verified against a scratch copy of
+the database: run one added the 3 missing games (1037 → 1040), run two added
+nothing, 0 errors (`evidence/GOGL-003.md`). It logs as `sync_log` type
+`ownership`, so it shows in Recent Activity. Not yet deployed.
+
 ## Next task
 
-`GOGL-002` — refresh the GOG access token server-side (`ready`; needs `local`).
-`GOGL-003`..`GOGL-005` and `DEPLOY-004` stay `blocked` behind it.
+`GOGL-004` — retire the GOG wishlist pass (`ready`; needs `local`). `GOGL-005`
+(the deletion, Bobby's to run) and `DEPLOY-004` stay `blocked` behind it.
 
 The round that preceded this one is **deployed and verified** (`DEPLOY-003`):
 the live container reports its next price window as `2026-09-17 11:00` UTC, and

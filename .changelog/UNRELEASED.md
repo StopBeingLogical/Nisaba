@@ -58,6 +58,8 @@
 - Added 3 lowest prices display to wishlist detail page (2026-06-28)
 
 ## sync/ Changes
+- Added `sync/gog_library.go` — the GOG library syncs itself once a day (`sync.gog_hour`, default 11 = 07:00 US Eastern) from the library view, 11 requests for the whole account, in its own window so the price run stays price-only (2026-09-16)
+- Added `sync/gog_auth.go` — GOG access tokens now refresh themselves from the stored refresh token (`gog.client_secret`), replacing the expiry check that rejected tokens GOG still accepts (2026-09-16)
 - Added `sync/schedule.go` — a daily price-only sync (`sync.price_hour`, default 11 = 07:00 US Eastern) that skips while another sync runs, skips without an ITAD key, and catches up after downtime (2026-09-16)
 - ITAD ID resolution is now one bulk `POST /lookup/id/shop/61/v1` per 100 Steam App IDs — 11 requests for the whole wishlist instead of ~609, which was 6× the key's 100-per-5-minute budget; the whole pricing pass dropped from ~13 minutes to 16.5 seconds (2026-09-16)
 - ITAD now writes `best_price_url` from the response's `current.url`, so deal links keep their affiliate tags rather than being reconstructed (2026-09-16)

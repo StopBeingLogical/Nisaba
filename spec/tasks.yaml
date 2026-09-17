@@ -267,7 +267,7 @@ tasks:
 
   - id: GOGL-002
     title: Refresh the GOG access token server-side
-    status: ready
+    status: done
     capability: strong-coder
     environment: [local]
     depends_on: [GOGL-001]
@@ -277,7 +277,7 @@ tasks:
 
   - id: GOGL-003
     title: Sync the GOG owned library on a schedule
-    status: blocked
+    status: done
     capability: strong-coder
     environment: [local]
     depends_on: [GOGL-002]
@@ -287,7 +287,7 @@ tasks:
 
   - id: GOGL-004
     title: Retire the GOG wishlist pass
-    status: blocked
+    status: ready
     capability: bounded-coder
     environment: [local]
     depends_on: [GOGL-002]
