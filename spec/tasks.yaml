@@ -345,6 +345,18 @@ tasks:
     outcome: Bobby confirms, then rsync and deploy.sh put the Playnite script skip and its observable logging on Atlas. The embedded script only reaches the browser through the binary, so this deploy is what makes the change real for him.
     acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]
 
+  # ── Audit 2026-09-17 — findings in spec/evidence/AUDIT-001.md ────────────
+
+  - id: AUDIT-001
+    title: Audit the live data
+    status: done
+    capability: strong-coder
+    environment: [local, atlas]
+    depends_on: [DEPLOY-006]
+    scope: [spec/evidence/AUDIT-001.md]
+    outcome: Account for every anomaly in the live database with counts and a cause, from a read-only copy, without writing to production. Establish what is clean as well as what is not, so the cleanup scope is measured rather than assumed. Bobby rules on the cleanup; nothing here is derived into a task before he does.
+    acceptance: ["scripts/spec-validate.sh", "grep -q 'integrity_check' spec/evidence/AUDIT-001.md", "grep -q 'excess' spec/evidence/AUDIT-001.md", "git diff --quiet -- db handlers sync main.go templates"]
+
   # ── Round 2026-09-17 (wishlist) — ruling in spec/PRODUCT-4.md ─────────────
 
   - id: WISH-001
