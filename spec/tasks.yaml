@@ -235,7 +235,7 @@ tasks:
 
   - id: DEPLOY-003
     title: Deploy the follow-up round
-    status: ready
+    status: in_progress
     capability: human
     environment: [atlas]
     depends_on: [PRICE-001, PRICE-002]
