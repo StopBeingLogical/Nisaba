@@ -10,8 +10,11 @@ evidence. Both changes landed: library responsiveness (5.63s → 0.081s, target
 comparison source. The gate is recorded in `evidence/REL-001.md`.
 
 The follow-up round closed with `DEPLOY-003`. The **GOG round (below) opened,
-ran as `GOGL-001`…`GOGL-007`, and closed with `DEPLOY-005`** — the only tasks
-left are the two Bobby-side actions listed under *Next task*.
+ran as `GOGL-001`…`GOGL-007`, and closed with `DEPLOY-005`** — its only remaining
+tasks are two Bobby-side actions listed under *Next task*.
+
+A **wishlist round opened 2026-09-17** (`PRODUCT-4.md`) after Bobby reported
+missing cover art. `WISH-001` is done and `DEPLOY-006` is the ready task.
 
 `OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
 rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
@@ -192,10 +195,49 @@ before the container was killed, because `deploy.sh` removes it *before* it
 builds. `/`, `/library` and `/wishlist` are 200; wishlist 672 with 0 GOG entries,
 `game_stores` gog rows 1037, nothing mid-sync (`evidence/DEPLOY-005.md`).
 
+## Wishlist round (2026-09-17) — `WISH-001` done, `DEPLOY-006` ready
+
+Bobby reported *"There are many games missing cover art."* Measured before
+anything changed: the **wishlist** had **396 of 676 entries without a cover**
+(59%); the library had 148 of 4101 (3.6%), confirmed by rendering the page —
+`/library` page 1 returns 195 covers and 5 placeholders out of 200 tiles. The
+library gap has a different cause and is out of scope.
+
+**The cause was a missing call, not missing data.** `EnrichWishlist`
+(`sync/igdb.go:492`) is the only writer of wishlist `igdb_id` and `artwork`, and
+nothing called it. Its two call sites were routes deleted by commit `9557160`
+(2026-06-27, *"Simplify sync page"*) — the same commit that orphaned the Steam
+Deck, ProtonDB and CrossRefs fetchers in `OPEN.md`, making this the fourth
+casualty and the only visible one. Verified on the pre-change code rather than
+assumed: **`SyncAll` never called it either**, so wiring it in is new behaviour,
+not a regression being undone. The 280 entries that had art were all enriched by
+2026-04-23, the last time the deleted button was pressed; every entry added
+since is `needs_review` with `last_enriched` NULL.
+
+**`WISH-001` landed 2026-09-17.** One call added to `SyncAll`'s enrichment step,
+after `EnrichLibrary`, with the same progress plumbing and non-fatal error
+handling. Matching, the 250ms tick and every linking behaviour are untouched.
+Proven against a copy of the live database with the real IGDB API: **283 of 339
+backlogged entries matched in 143 seconds, 0 errors**, artwork coverage 328 →
+610 of 667, and a second run matched nothing and changed no row
+(`evidence/WISH-001.md`).
+
+**The backfill is the sync itself** — no hand-run SQL. The first Full sync after
+the deploy processes every `needs_review` entry because
+`ListWishlistNeedsEnrichment` selects on status alone. On live that is 396
+entries; the copy's 83.5% match rate projects to roughly **610 of 676 with art**.
+`DEPLOY-006` records the actual numbers.
+
+Two things are named and accepted rather than solved: `bestMatch` is title
+matching and misses edition suffixes (`Baldur's Gate 3`, *Divinity: Original Sin
+2 - Definitive Edition*), leaving ~55 unmatched with the manual cover field as
+the correction path; and the retry cost is real on the first run but falls away,
+because later runs see only entries the Steam sync just added.
+
 ## Next task
 
-None. The round is complete and deployed, and `scripts/spec-next.sh` prints
-nothing.
+`DEPLOY-006` — deploy the wishlist enrichment and run a Full sync to backfill.
+`scripts/spec-next.sh local,atlas,network` prints exactly that and nothing else.
 
 **Both scheduled runs fired on 2026-09-17 and were observed**, exactly as
 predicted — `sync_log` id 87 `pricing` (539 updated) and id 88 `ownership`

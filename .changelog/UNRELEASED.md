@@ -40,6 +40,7 @@
 - Added migration: price_thresholds table with 4 seeded default rows (2026-06-28)
 
 ## handlers/ Changes
+- The full sync now enriches wishlist entries as well as games. The wishlist pass had no caller since commit 9557160, so every entry added after 2026-04-23 arrived with no IGDB id and no cover art — 396 of 676 on the live database (2026-09-17)
 - Playnite runs record to `sync_log` and `sync_errors` as type `ownership`; the old `playnite` value failed the schema's CHECK, so those runs and their errors were silently discarded and never reached Recent Activity (2026-09-16)
 - The full sync no longer runs a GOG wishlist pass — Steam is the only wishlist source, and the GOG settings card now documents itself as the library's credentials (2026-09-16)
 - Wishlist views show the GG.deals price where ITAD has no price, labelled GG.deals, instead of "no pricing data" (2026-09-16)

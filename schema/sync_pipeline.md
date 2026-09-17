@@ -21,7 +21,9 @@
 >   (`GOGL-004`), and its 58 rows are deleted (`GOGL-005`).
 > - **The Sync All sequence below is not the sequence.** The shipped Full sync is
 >   Steam ownership → Steam wishlist → ITAD pricing → GG.deals comparison →
->   reseller pricing → IGDB enrichment (`handlers/sync.go`, `SyncAll`).
+>   reseller pricing → IGDB enrichment of the library, then of the wishlist
+>   (`handlers/sync.go`, `SyncAll`). The wishlist pass was orphaned from
+>   2026-06-27 until `WISH-001` restored it on 2026-09-17.
 
 The sync panel splits into three independent operations, each triggerable separately
 or together via "Sync All".

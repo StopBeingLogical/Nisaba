@@ -344,3 +344,25 @@ tasks:
     scope: [spec/evidence/DEPLOY-005.md]
     outcome: Bobby confirms, then rsync and deploy.sh put the Playnite script skip and its observable logging on Atlas. The embedded script only reaches the browser through the binary, so this deploy is what makes the change real for him.
     acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]
+
+  # ── Round 2026-09-17 (wishlist) — ruling in spec/PRODUCT-4.md ─────────────
+
+  - id: WISH-001
+    title: Enrich wishlist entries in the full sync
+    status: done
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [DEPLOY-005]
+    scope: [handlers/sync.go, spec/evidence/WISH-001.md]
+    outcome: The Full sync's enrichment step runs EnrichWishlist alongside EnrichLibrary, so a wishlist entry the Steam sync adds stops arriving as needs_review with no igdb_id and no artwork. Measured 2026-09-17 (spec/PRODUCT-4.md): EnrichWishlist has no caller at all — its only call sites were routes deleted by commit 9557160 — and SyncAll has never called it, so this is new behaviour rather than a regression. Do not change bestMatch, the 250ms tick, or ListWishlistNeedsEnrichment, and do not touch cleanupWishlistLinks or any linking behaviour.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'EnrichWishlist' handlers/sync.go"]
+
+  - id: DEPLOY-006
+    title: Deploy the wishlist enrichment and backfill
+    status: ready
+    capability: human
+    environment: [atlas]
+    depends_on: [WISH-001]
+    scope: [spec/evidence/DEPLOY-006.md]
+    outcome: Bobby confirms, then rsync and deploy.sh put the wired wishlist enrichment on Atlas and a Full sync is run to backfill. The backfill is the sync itself, not a hand-run statement: the first run processes all 396 needs_review entries at 250ms each (~100s) and stamps each one. Record the before and after counts for entries with artwork and with an igdb_id, and the run's sync_log row.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q 'before' spec/evidence/DEPLOY-006.md", "grep -q 'after' spec/evidence/DEPLOY-006.md"]

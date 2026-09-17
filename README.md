@@ -82,11 +82,16 @@ GOG library (server-side, once a day)                    ─┘
 The manual **Full sync** on `/sync` runs these steps in order:
 
 ```
-Steam ownership → Steam wishlist → ITAD pricing → GG.deals comparison → reseller pricing → IGDB enrichment
+Steam ownership → Steam wishlist → ITAD pricing → GG.deals comparison → reseller pricing → IGDB enrichment (library, then wishlist)
 ```
 
-Only the Steam wishlist is imported; GOG's is retired. `go build ./...` aside,
-the authoritative step list is `SyncAll` in `handlers/sync.go`.
+Only the Steam wishlist is imported; GOG's is retired. Enrichment runs twice —
+`EnrichLibrary` then `EnrichWishlist` — because the first pass only reads games,
+so a wishlist entry that the Steam sync has just added would otherwise keep
+neither an IGDB id nor artwork. The wishlist pass throttles at 4 requests/second,
+so a large backlog takes minutes on the first run and seconds afterwards, when
+only newly added entries remain. `go build ./...` aside, the authoritative step
+list is `SyncAll` in `handlers/sync.go`.
 
 ### Pricing pipeline
 

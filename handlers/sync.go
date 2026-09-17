@@ -203,6 +203,35 @@ func (h *Handler) SyncAll(w http.ResponseWriter, r *http.Request) {
 			} else {
 				enrichNote = fmt.Sprintf(", enriched %d/%d", p.Matched, p.Total)
 			}
+
+			// EnrichLibrary only reads games, so wishlist entries need their own
+			// pass or they stay needs_review with no igdb_id and no artwork.
+			log.Printf("sync-all: step — IGDB wishlist enrichment")
+			setStep("Running IGDB wishlist enrichment…")
+			h.enrichment.mu.Lock()
+			h.enrichment.running = true
+			h.enrichment.prog = storesync.EnrichProgress{}
+			h.enrichment.mu.Unlock()
+
+			wlErr := storesync.EnrichWishlist(h.store, client, func(p storesync.EnrichProgress) {
+				h.enrichment.mu.Lock()
+				h.enrichment.prog = p
+				h.enrichment.mu.Unlock()
+				if p.Done%100 == 0 && p.Done > 0 {
+					log.Printf("sync-all: wishlist enrichment progress — %d / %d", p.Done, p.Total)
+				}
+			}, h.rawgClient())
+
+			h.enrichment.mu.Lock()
+			h.enrichment.running = false
+			wlProg := h.enrichment.prog
+			h.enrichment.mu.Unlock()
+
+			if wlErr != nil {
+				enrichNote += fmt.Sprintf(", wishlist enrichment failed: %v", wlErr)
+			} else {
+				enrichNote += fmt.Sprintf(", wishlist enriched %d/%d", wlProg.Matched, wlProg.Total)
+			}
 		} else {
 			enrichNote = ", enrichment skipped (IGDB not configured)"
 		}
