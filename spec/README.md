@@ -8,7 +8,8 @@ throughout.
 ## Authority
 
 1. `../SESSION_SEED.md` — role, rights, invariants, rituals.
-2. `PRODUCT.md` — locked owner requirements.
+2. `PRODUCT.md`, `PRODUCT-2.md` — locked owner requirements, one file per
+   round.
 3. `contracts/` — stable implementation boundaries.
 4. `tasks.yaml` — task graph and status authority.
 5. `context-map.yaml` — required reading selected by task prefix.

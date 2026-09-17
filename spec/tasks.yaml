@@ -211,6 +211,38 @@ tasks:
     outcome: A wishlist entry whose GG.deals price is lower than ITAD's best current price shows a callout linking to that game's GG.deals page — the existence of the lower price only, never what the listing is or which shop it is from.
     acceptance: ["go build ./...", "go test ./...", "grep -q 'gg.deals' templates/wishlist_detail.html"]
 
+  # ── Round 2026-09-16 (follow-up) — rulings in spec/PRODUCT-2.md ────────────
+
+  - id: PRICE-001
+    title: Add the daily price-only sync
+    status: in_progress
+    capability: strong-coder
+    environment: [local]
+    depends_on: [GG-006]
+    scope: [sync/schedule.go, db/store.go, main.go]
+    outcome: The app refreshes prices once a day on its own — the ITAD pass then the GG.deals comparison, nothing else — at the hour in app_config sync.price_hour, logging to sync_log as type 'pricing'. Skips while any other sync is running, and catches up after a restart if the day's window passed and the last price sync is 20h old. No Settings UI.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
+
+  - id: PRICE-002
+    title: Show the GG.deals price where ITAD has none
+    status: ready
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [GG-006]
+    scope: [templates/]
+    outcome: An entry with no ITAD price but a GG.deals price renders that price labelled GG.deals, in the detail view and both list views, instead of the current "no pricing data" placeholder. No shop is named and nothing is written to the database — this is display only.
+    acceptance: ["go build ./...", "go test ./..."]
+
+  - id: DEPLOY-003
+    title: Deploy the follow-up round
+    status: blocked
+    capability: human
+    environment: [atlas]
+    depends_on: [PRICE-001, PRICE-002]
+    scope: [spec/evidence/DEPLOY-003.md]
+    outcome: rsync and deploy.sh put the daily sync and the fallback on Atlas, and the schedule's first run and the fallback are confirmed live.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]
+
   - id: REL-001
     title: Record the completion gate
     status: done
