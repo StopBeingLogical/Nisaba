@@ -257,7 +257,7 @@ tasks:
 
   - id: GOGL-001
     title: Prove the stored GOG refresh token still refreshes
-    status: ready
+    status: done
     capability: strong-coder
     environment: [local, network]
     depends_on: [REL-001]
@@ -267,12 +267,12 @@ tasks:
 
   - id: GOGL-002
     title: Refresh the GOG access token server-side
-    status: blocked
+    status: ready
     capability: strong-coder
     environment: [local]
     depends_on: [GOGL-001]
-    scope: [sync/gog_auth.go, sync/gog_wishlist.go, db/store.go]
-    outcome: A single helper returns a usable GOG access token, refreshing it from the stored refresh token when the stored one has expired and writing the refreshed access and refresh tokens back to app_config, so the app never needs a hand-pasted token again once one has been pushed.
+    scope: [sync/gog_auth.go, sync/gog_wishlist.go, db/store.go, handlers/settings.go, templates/settings.html]
+    outcome: A single helper returns a usable GOG access token, refreshing it from the stored refresh token and writing both refreshed tokens back to app_config, so the app never needs a hand-pasted token again once one has been pushed. Proof, 2026-09-16 (evidence/GOGL-001.md): refresh works, returns a rotated refresh token, does not invalidate the old one, and the stored access token is accepted by GOG long past its recorded expiry — so the helper must not gate on the recorded expiry alone, and must treat a 302 from an authenticated endpoint as needing a refresh. The Galaxy client secret comes from app_config as gog.client_secret, never as a repository constant (ACCEPTANCE.md forbids a secret in the repository); the settings view shows a set/unset boolean per the existing convention.
     acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
 
   - id: GOGL-003
@@ -282,7 +282,7 @@ tasks:
     environment: [local]
     depends_on: [GOGL-002]
     scope: [sync/gog_library.go, sync/schedule.go, db/store.go, main.go]
-    outcome: The owned-product list becomes games and gog store links on its own — the ids from the owned endpoint upserted the way importGOG upserts today, titles resolved from the product endpoint — on the daily schedule and logging to sync_log as type 'ownership'.
+    outcome: The GOG library becomes games and gog store links on its own, on the daily schedule, logging to sync_log as type 'ownership'. Proof, 2026-09-16 (evidence/GOGL-001.md): fetch /account/getFilteredProducts?mediaType=1 at 100 per page — 11 requests for the whole account — which carries id, title, url, image, worksOn (Windows/Mac/Linux) and isGame/isMovie/isHidden; do not resolve the owned ids individually (1397 requests) and do not sync /user/data/games at all, because its 1397 ids include 358 entitlements the library view does not show. Upsert the way importGOG upserts today. mediaType=2 is empty for this account, so no movie handling is needed.
     acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
 
   - id: GOGL-004

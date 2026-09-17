@@ -89,13 +89,27 @@ Bobby ruled two changes after the follow-up round closed; they are locked in
   wishlist is Steam-only from here. The auth push and paste stay, because they
   are now the library's credential path.
 
-`GOGL-001` runs before any sync code: it proves the stored refresh token still
-refreshes, and it needs Bobby's go-ahead because it uses that credential.
+**`GOGL-001` passed 2026-09-16** (`evidence/GOGL-001.md`), and it changed the
+shape of the work:
+
+- The stored refresh token still refreshes, returns a rotated refresh token, and
+  **rotation does not invalidate the old one** — so nothing in the live config
+  was broken by the proof and no re-push from Praxis is needed.
+- The stored access token is still accepted by GOG about six months past its
+  recorded expiry, so the recorded expiry must not be the refresh gate
+  (`gogGetAccessToken` rejects a token GOG would accept).
+- **`/account/getFilteredProducts?mediaType=1` is the sync source, not
+  `/user/data/games`.** It returns 1040 products over 11 requests with titles,
+  images, platforms and flags. The owned endpoint's 1397 ids include 358
+  entitlements the library view does not show (packs, Prime/Luna rewards,
+  delisted products).
+- The library is not short of 361 games: the 1037 `gog` rows reconcile against
+  the 1040-product library view as 3 missing and 0 stale.
 
 ## Next task
 
-`GOGL-001` — prove the stored GOG refresh token still refreshes (`ready`; needs
-`local` + `network`). Everything after it is `blocked` on its answer.
+`GOGL-002` — refresh the GOG access token server-side (`ready`; needs `local`).
+`GOGL-003`..`GOGL-005` and `DEPLOY-004` stay `blocked` behind it.
 
 The round that preceded this one is **deployed and verified** (`DEPLOY-003`):
 the live container reports its next price window as `2026-09-17 11:00` UTC, and
