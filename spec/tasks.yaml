@@ -173,7 +173,7 @@ tasks:
 
   - id: DEPLOY-002
     title: Deploy the price-source change
-    status: ready
+    status: done
     capability: human
     environment: [atlas]
     depends_on: [GG-003]
@@ -183,7 +183,7 @@ tasks:
 
   - id: GG-004
     title: Verify real store names reach the UI
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [atlas, network]
     depends_on: [DEPLOY-002]
@@ -213,7 +213,7 @@ tasks:
 
   - id: REL-001
     title: Record the completion gate
-    status: blocked
+    status: done
     capability: strong-coder
     environment: [local, network]
     depends_on: [PERF-007, GG-004, GG-006]

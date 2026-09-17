@@ -4,10 +4,13 @@
 
 ## Current milestone
 
-Specification ratified; the SPEC and BASE chains are closed, both discovery tasks
-have reported, and both rulings are in. The library fix is implemented and
-verified locally; nothing is deployed. The 2026-08-01 round covers library page
-performance and GG.deals store-name granularity.
+**The 2026-08-01 round is complete in production.** All 21 tasks are `done` with
+evidence. Both changes landed: library responsiveness (5.63s → 0.081s, target
+<1s) and real storefront names in price data and the UI, with GG.deals kept as a
+comparison source. The gate is recorded in `evidence/REL-001.md`.
+
+Nothing is in flight. New work has no open rulings and no unanswered entries in
+`OPEN.md`; corrections Bobby asks for become new tasks.
 
 ## Established baseline
 
@@ -33,41 +36,54 @@ source.
 - Two test files exist in roughly 15,500 lines, both from the mystery-packs
   feature. `main.go` and `db/store.go` have none.
 
+## Where the pricing data stands (live, 2026-09-16)
+
+- Provider: ITAD, authoritative for `best_current_price`, `best_current_store`,
+  `best_price_url`, the historical low, and price history. IDs resolve in bulk
+  (one `POST /lookup/id/shop/61/v1` per 100 Steam App IDs) — 11 requests for the
+  whole wishlist, 2.2% of the key's 100-per-5-minute budget, where the old
+  per-entry loop needed ~609 (6× over) and the full sync took ~13 minutes.
+- Live after the cutover sync: 494 priced entries across 20 real storefronts,
+  494 deal URLs, 494 history rows, **zero** `gg.deals/*` category values left in
+  either column. 284 entries are cheaper on GG.deals and show the callout.
+- GG.deals is a comparison source only: it writes `gg_deals_price` /
+  `gg_deals_url` and nothing else — verified by re-running its pass over a synced
+  database and diffing all 667 rows' ITAD columns (identical).
+- Scorched earth (18,335 history rows, 493 category values) ran once, by hand,
+  after the migrations — **not code**, and it never runs again.
+
 ## Next task
 
-The PERF half is **complete in production**. The GG implementation half is
-**built and verified locally** as of 2026-09-16 (`GG-002` → `GG-003` → `GG-005` →
-`GG-006`, all `done`, each with evidence): ITAD is the authoritative provider via
-the bulk ID endpoint, `best_current_store` and price history hold real storefront
-names, and GG.deals feeds a comparison column plus the cheaper-on-GG.deals
-callout. Nothing is deployed.
+None. The round's gate passed in full (`evidence/REL-001.md`); two gate lines are
+recorded there as partial-with-explanation rather than claimed clean: "nothing
+references" the deleted sqlc scaffolding (13 files mention it, all describing the
+removal or the superseded design doc) and "no user data was deleted" (the ruled
+scorched-earth delete removed pre-cutover *price* rows; no entry, game, or
+user-authored field was touched).
 
-Next is **`DEPLOY-002`**: rsync, rebuild, restart, then the scorched-earth delete
-on the live database *after* migrations add `gg_deals_price`/`gg_deals_url` (the
-delete fails to prepare against the old schema — hit on the copy), then
-`itad.api_key` into `app_config` and `GG-004`'s live sync, then the `REL-001` gate.
-
-Measured locally against a copy of production: ITAD priced 494 entries with real
-shop names in 11 requests (was ~609 requests, 6× over the key's 100/5-minute
-budget); the full pricing pass — both providers — takes 16.5s against ~13 minutes
-before; 284 entries come out cheaper on GG.deals. Nothing promotes itself.
+A full sync from the UI has not been run since the cutover, so the current prices
+arrived via the one-off harness rather than the button — the next button-driven
+sync will exercise the same code path and log to `sync_log`.
 
 ## Blockers
 
-- `DEPLOY-001`, `DEPLOY-002`, and `GG-004` need authorized `atlas` access in the
-  executing session. Verified reachable from Ergaster on 2026-09-16
-  (`ssh truenas_admin@192.168.3.174` → `truenas`; live DB `games` = 4033).
-- `DEPLOY-001` and `DEPLOY-002` are `human` tasks because they restart the
-  production container, not because a TTY is required. That constraint was
-  measured false on 2026-09-16: `sudo -n docker` works over non-interactive SSH
-  for `truenas_admin` and `deploy.sh` ran without `-t`. `DEPLOY-001` was executed
-  with Bobby's explicit go-ahead; `DEPLOY-002` is authorized the same way.
-- `GG-002` needs `itad.api_key` present in the live `app_config`. Registered
-  2026-09-16 as `Nisaba_redux`, verified against both endpoints used, and held by
-  Bobby outside the repository; `DEPLOY-002` loads it during the deploy. It is
-  never committed, never written into evidence, and never in a changelog entry.
-- `GG-002`'s approach is settled by `GG-001` addendum 2: bulk ID resolution via
-  `POST /lookup/id/shop/61/v1`, because the key's limit is 100 requests per
-  5 minutes (Bobby's setup page; the docs claim 1000), which the per-entry loop
-  would overrun 6×.
-- `OPEN.md` has no unanswered entries as of 2026-09-16.
+None. `OPEN.md` has no unanswered entries, no task is blocked, and the deployed
+instance is healthy.
+
+Reference facts a future session should not have to re-derive:
+
+- `atlas` is reachable from Ergaster as `truenas_admin@192.168.3.174` with the
+  SSH key, non-interactively. `sudo -n` works over plain SSH — **no `-t` and no
+  password prompt**, which contradicts what `SESSION_SEED.md` and `CLAUDE.md`
+  used to claim and is corrected in both. Live DB:
+  `/mnt/MemoryAlpha/nisaba/data/nisaba.db`, source and `deploy.sh` in
+  `/mnt/MemoryAlpha/nisaba/source/`.
+- `/tmp` on Atlas is `noexec`; a binary that has to run on the host belongs on a
+  dataset (`/mnt/MemoryAlpha/...`), not in `/tmp`.
+- `itad.api_key` is set in the live `app_config` (app registered 2026-09-16 as
+  `Nisaba_redux`, limit 100 requests / 5 minutes per Bobby's setup page — not the
+  1000 the docs state; no rate-limit headers are exposed). It is never committed,
+  never written into evidence, and never in a changelog entry.
+- Migrations must run before any SQL that references a newly added column: the
+  scorched-earth update fails to prepare against a pre-migration database
+  (`no such column: gg_deals_price`).
