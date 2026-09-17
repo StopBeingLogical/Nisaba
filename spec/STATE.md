@@ -9,8 +9,9 @@ evidence. Both changes landed: library responsiveness (5.63s → 0.081s, target
 <1s) and real storefront names in price data and the UI, with GG.deals kept as a
 comparison source. The gate is recorded in `evidence/REL-001.md`.
 
-Nothing is in flight. New work has no open rulings and no unanswered entries in
-`OPEN.md`; corrections Bobby asks for become new tasks.
+The follow-up round closed with `DEPLOY-003` and the **GOG round is now open**
+(below). `OPEN.md` has one unanswered entry — the `sync_log` constraint defect
+no task may derive from.
 
 ## Established baseline
 
@@ -72,11 +73,33 @@ Bobby ruled two changes after the 2026-08-01 gate closed; they are locked in
 **Deferred by Bobby, not forgotten:** the GOG access token is expired, so the GOG
 wishlist is skipped on every full sync — `re-paste auth.json in Settings`.
 
+## GOG round (2026-09-16) — open
+
+Bobby ruled two changes after the follow-up round closed; they are locked in
+`PRODUCT-3.md` and tracked as `GOGL-001`…`GOGL-005` and `DEPLOY-004`.
+
+- **The GOG owned library syncs itself, server-side** (route ruled 2026-09-16).
+  The only reachable path today is a Playnite script Bobby pastes by hand
+  (`templates/sync.html:71-76`); the Heroic import handler has no route
+  (`handlers/sync.go:520`), and `gog.refresh_token` is stored and never read
+  (`handlers/gog_auth.go:71`). The app will refresh its own access token from
+  the GOG API and pull the owned list, so no machine and no paste sit in the
+  loop.
+- **The GOG wishlist is retired and its 58 `gog-wish-` rows are deleted** —
+  wishlist is Steam-only from here. The auth push and paste stay, because they
+  are now the library's credential path.
+
+`GOGL-001` runs before any sync code: it proves the stored refresh token still
+refreshes, and it needs Bobby's go-ahead because it uses that credential.
+
 ## Next task
 
-None. The follow-up round is **deployed and verified** (`DEPLOY-003`): the live
-container reports its next price window as `2026-09-17 11:00` UTC, and the
-GG.deals fallback renders for all five of the entries it applies to.
+`GOGL-001` — prove the stored GOG refresh token still refreshes (`ready`; needs
+`local` + `network`). Everything after it is `blocked` on its answer.
+
+The round that preceded this one is **deployed and verified** (`DEPLOY-003`):
+the live container reports its next price window as `2026-09-17 11:00` UTC, and
+the GG.deals fallback renders for all five of the entries it applies to.
 
 **One thing is scheduled rather than observed:** the first automatic price run
 has not happened yet — it is 2026-09-17 11:00 UTC. Verify by looking for a

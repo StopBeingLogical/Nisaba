@@ -6,6 +6,19 @@ deleted.
 
 ## Awaiting a ruling
 
+- **May `sync_log` be rebuilt so its `type` constraint matches the code?**
+  `sync_log.type` allows only `('full', 'ownership', 'install', 'pricing',
+  'wishlist', 'rehydrate')` (`schema.sql:265`), but the code logs
+  `StartSync("playnite")` (`handlers/sync.go:323`) and
+  `StartSync("mystery_packs")` (`handlers/sync.go:470`). Both inserts fail the
+  constraint, `logID` stays 0, and `FinishSync`/`AppendSyncErrors` are skipped —
+  so **no Playnite run has ever appeared in Recent Activity and no Playnite
+  error is ever recorded**, and the same is true of mystery-pack analyses.
+  Verified 2026-09-16 on a throwaway copy of the live database: both inserts
+  error with `CHECK constraint failed`. No migration in `main.go` touches
+  `sync_log`. Fixing it means replacing the table (SQLite cannot alter a CHECK),
+  which the additive-and-idempotent-only migration ruling does not currently
+  allow. Not derived into a task.
 
 ## Model inferences, unratified
 

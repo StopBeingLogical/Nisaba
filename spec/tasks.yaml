@@ -252,3 +252,65 @@ tasks:
     scope: [spec/evidence/REL-001.md, spec/STATE.md]
     outcome: Verify every line of spec/ACCEPTANCE.md against one commit and record the result.
     acceptance: ["scripts/spec-validate.sh", "go build ./...", "go vet ./...", "go test ./..."]
+
+  # ── Round 2026-09-16 (GOG) — rulings in spec/PRODUCT-3.md ─────────────────
+
+  - id: GOGL-001
+    title: Prove the stored GOG refresh token still refreshes
+    status: ready
+    capability: strong-coder
+    environment: [local, network]
+    depends_on: [REL-001]
+    scope: [spec/evidence/GOGL-001.md]
+    outcome: Establish against GOG's live endpoints whether the refresh token already stored in app_config still yields an access token, whether the owned-product endpoint returns the account's library, and what the access token's expiry is. Record the owned count beside the 1037 gog rows in game_stores. Name explicitly what a rotated refresh token means for the live config. No source changes — this is a proof, and it needs Bobby's go-ahead before the credential call because it uses the stored token.
+    acceptance: ["grep -q 'Refresh' spec/evidence/GOGL-001.md", "grep -q 'owned' spec/evidence/GOGL-001.md", "git diff --quiet -- sync handlers db main.go templates"]
+
+  - id: GOGL-002
+    title: Refresh the GOG access token server-side
+    status: blocked
+    capability: strong-coder
+    environment: [local]
+    depends_on: [GOGL-001]
+    scope: [sync/gog_auth.go, sync/gog_wishlist.go, db/store.go]
+    outcome: A single helper returns a usable GOG access token, refreshing it from the stored refresh token when the stored one has expired and writing the refreshed access and refresh tokens back to app_config, so the app never needs a hand-pasted token again once one has been pushed.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
+
+  - id: GOGL-003
+    title: Sync the GOG owned library on a schedule
+    status: blocked
+    capability: strong-coder
+    environment: [local]
+    depends_on: [GOGL-002]
+    scope: [sync/gog_library.go, sync/schedule.go, db/store.go, main.go]
+    outcome: The owned-product list becomes games and gog store links on its own — the ids from the owned endpoint upserted the way importGOG upserts today, titles resolved from the product endpoint — on the daily schedule and logging to sync_log as type 'ownership'.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./..."]
+
+  - id: GOGL-004
+    title: Retire the GOG wishlist pass
+    status: blocked
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [GOGL-002]
+    scope: [handlers/sync.go, handlers/settings.go, templates/settings.html, sync/gog_wishlist.go]
+    outcome: The full sync no longer runs a GOG wishlist pass and no settings card advertises one, while the GOG auth push and paste stay because they are now the library's credential path. Nothing else about the wishlist changes.
+    acceptance: ["go build ./...", "go test ./...", "! grep -q 'SyncGOGWishlist' handlers/sync.go"]
+
+  - id: GOGL-005
+    title: Delete the stale GOG wishlist entries
+    status: blocked
+    capability: human
+    environment: [atlas]
+    depends_on: [GOGL-004]
+    scope: [spec/evidence/GOGL-005.md]
+    outcome: The gog-wish- entries and their store links and price history are removed from the live database by Bobby, with before and after counts recorded. One-off, by hand, like the 2026-09-16 scorched earth — not code, and it never runs again.
+    acceptance: ["grep -q 'before' spec/evidence/GOGL-005.md", "grep -q 'after' spec/evidence/GOGL-005.md"]
+
+  - id: DEPLOY-004
+    title: Deploy the GOG round
+    status: blocked
+    capability: human
+    environment: [atlas]
+    depends_on: [GOGL-003, GOGL-005]
+    scope: [spec/evidence/DEPLOY-004.md]
+    outcome: Bobby confirms, then rsync and deploy.sh put the server-side GOG sync and the wishlist retirement on Atlas, and a library sync is confirmed live.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]
