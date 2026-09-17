@@ -74,9 +74,16 @@ wishlist is skipped on every full sync — `re-paste auth.json in Settings`.
 
 ## Next task
 
-**`DEPLOY-003`** — rsync, rebuild, restart, set `sync.price_hour` on the live
-`app_config`, and confirm the startup log's announced window plus the fallback
-live. The 2026-08-01 gate itself passed in full (`evidence/REL-001.md`); two gate
+None. The follow-up round is **deployed and verified** (`DEPLOY-003`): the live
+container reports its next price window as `2026-09-17 11:00` UTC, and the
+GG.deals fallback renders for all five of the entries it applies to.
+
+**One thing is scheduled rather than observed:** the first automatic price run
+has not happened yet — it is 2026-09-17 11:00 UTC. Verify by looking for a
+`sync_log` row with `type='pricing'`, `status='done'`, ~500 in `games_updated`.
+The mechanism itself is proven in `evidence/PRICE-001.md`.
+
+The 2026-08-01 gate passed in full (`evidence/REL-001.md`); two gate
 lines are
 recorded there as partial-with-explanation rather than claimed clean: "nothing
 references" the deleted sqlc scaffolding (13 files mention it, all describing the
