@@ -727,6 +727,7 @@ func (s *Store) ListWishlist(p ListWishlistParams) ([]WishlistRow, error) {
 SELECT w.id, w.library_id, w.title, w.sort_title, w.enrichment_status,
        w.artwork, w.steam_deck_verified, w.currency,
        w.best_current_price, w.best_current_store,
+       w.gg_deals_price, w.gg_deals_url,
        w.historical_low_price, w.historical_low_store,
        w.target_price, w.priority, w.date_added,
        (SELECT GROUP_CONCAT(tag)   FROM wishlist_tags   WHERE wishlist_id = w.id) AS tags,
@@ -751,6 +752,7 @@ WHERE %s ORDER BY %s`, strings.Join(where, " AND "), orderBy)
 			&r.ID, &r.LibraryID, &r.Title, &r.SortTitle, &r.EnrichmentStatus,
 			&r.ArtworkRaw, &r.SteamDeckVerifiedRaw, &r.Currency,
 			&r.BestCurrentPrice, &r.BestCurrentStore,
+			&r.GGDealsPrice, &r.GGDealsURL,
 			&r.HistoricalLowPrice, &r.HistoricalLowStore,
 			&r.TargetPrice, &r.Priority, &r.DateAdded,
 			&r.TagsRaw, &r.StoresRaw,
@@ -1032,6 +1034,7 @@ func (s *Store) GetWishlistDetail(id string) (*WishlistDetailRow, error) {
 SELECT w.id, w.library_id, w.igdb_id, w.title, w.sort_title, w.enrichment_status,
        w.artwork, w.steam_deck_verified, w.currency,
        w.best_current_price, w.best_current_store, w.best_price_url,
+       w.gg_deals_price, w.gg_deals_url,
        w.historical_low_price, w.historical_low_store,
        w.last_price_sync, w.target_price, w.preferred_store,
        w.priority, w.notes, w.date_added,
@@ -1041,6 +1044,7 @@ WHERE w.id = ?`, id).Scan(
 		&r.ID, &r.LibraryID, &r.IGDBId, &r.Title, &r.SortTitle, &r.EnrichmentStatus,
 		&r.ArtworkRaw, &r.SteamDeckVerifiedRaw, &r.Currency,
 		&r.BestCurrentPrice, &r.BestCurrentStore, &r.BestPriceURL,
+		&r.GGDealsPrice, &r.GGDealsURL,
 		&r.HistoricalLowPrice, &r.HistoricalLowStore,
 		&r.LastPriceSync, &r.TargetPrice, &r.PreferredStore,
 		&r.Priority, &r.Notes, &r.DateAdded,
@@ -1305,6 +1309,17 @@ WHERE id = ?`,
 		_ = s.InsertWishlistPriceHistory(p.ID, *p.BestCurrentPrice, *p.BestCurrentStore)
 	}
 	return nil
+}
+
+// UpdateWishlistGGDealsComparison stores the GG.deals price and the game's
+// GG.deals page URL. ITAD stays authoritative for best_current_* and history;
+// these columns exist only to flag a cheaper listing elsewhere.
+func (s *Store) UpdateWishlistGGDealsComparison(id string, price *float64, url *string) error {
+	_, err := s.db.Exec(`
+UPDATE wishlist_entries SET gg_deals_price = ?, gg_deals_url = ? WHERE id = ?`,
+		price, url, id,
+	)
+	return err
 }
 
 // ToggleWishlistFlagRemove flips the flag_remove boolean for a wishlist entry.
@@ -1582,6 +1597,7 @@ const wishlistRowColumns = `
 w.id, w.library_id, w.title, w.sort_title, w.enrichment_status,
 w.artwork, w.steam_deck_verified, w.currency,
 w.best_current_price, w.best_current_store,
+w.gg_deals_price, w.gg_deals_url,
 w.historical_low_price, w.historical_low_store,
 w.target_price, w.priority, w.date_added,
 (SELECT GROUP_CONCAT(tag)   FROM wishlist_tags   WHERE wishlist_id = w.id) AS tags,
@@ -1602,6 +1618,7 @@ func scanWishlistRows(rows interface {
 			&r.ID, &r.LibraryID, &r.Title, &r.SortTitle, &r.EnrichmentStatus,
 			&r.ArtworkRaw, &r.SteamDeckVerifiedRaw, &r.Currency,
 			&r.BestCurrentPrice, &r.BestCurrentStore,
+			&r.GGDealsPrice, &r.GGDealsURL,
 			&r.HistoricalLowPrice, &r.HistoricalLowStore,
 			&r.TargetPrice, &r.Priority, &r.DateAdded,
 			&r.TagsRaw, &r.StoresRaw,

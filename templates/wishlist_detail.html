@@ -95,6 +95,16 @@
                     </span>
                     <span class="text-xs text-gray-500">{{ storeShortLabel .Entry.BestCurrentStore.String }}</span>
                 </div>
+                {{ if and .Entry.GGDealsPrice.Valid .Entry.BestCurrentPrice.Valid (lt .Entry.GGDealsPrice.Float64 .Entry.BestCurrentPrice.Float64) }}
+                <div class="flex items-center gap-2 mb-3 px-2 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                    <span class="text-xs font-medium text-emerald-400">Cheaper on GG.deals</span>
+                    <span class="text-xs text-gray-400">${{ printf "%.2f" .Entry.GGDealsPrice.Float64 }}</span>
+                    {{ if .Entry.GGDealsURL.Valid }}
+                    <a href="{{ .Entry.GGDealsURL.String }}" target="_blank" rel="noopener"
+                       class="text-xs text-emerald-400 hover:text-emerald-300 ml-auto">GG.deals ↗</a>
+                    {{ end }}
+                </div>
+                {{ end }}
                 {{ if .Entry.BestPriceURL.Valid }}
                 <a href="{{ .Entry.BestPriceURL.String }}" target="_blank" rel="noopener"
                    class="text-xs text-amber-500 hover:text-amber-400 -mt-2 mb-2 inline-block">View deal ↗</a>

@@ -35,28 +35,37 @@ source.
 
 ## Next task
 
-The PERF half of the round is **complete in production**. The GG half is next:
-`GG-002` (ITAD authoritative, scorched earth on both columns, `best_price_url`
-from `current.url`) once `itad.api_key` is in the live config, then `GG-003`,
-`GG-005`, `GG-006`, `DEPLOY-002`, `GG-004`, and `REL-001` closes the gate. Nothing
-promotes itself.
+The PERF half is **complete in production**. The GG implementation half is
+**built and verified locally** as of 2026-09-16 (`GG-002` → `GG-003` → `GG-005` →
+`GG-006`, all `done`, each with evidence): ITAD is the authoritative provider via
+the bulk ID endpoint, `best_current_store` and price history hold real storefront
+names, and GG.deals feeds a comparison column plus the cheaper-on-GG.deals
+callout. Nothing is deployed.
 
-The GG chain is fully ruled as of 2026-09-16: `GG-002` (ITAD authoritative;
-scorched earth on both columns) → `GG-003` (shop-name labels) → `GG-005` (GG.deals
-kept as a comparison source) → `GG-006` (cheaper-on-GG.deals callout), with
-`DEPLOY-002` → `GG-004` for the live check, then the `REL-001` gate. `GG-002` needs
-`itad.api_key` in the live config first.
+Next is **`DEPLOY-002`**: rsync, rebuild, restart, then the scorched-earth delete
+on the live database *after* migrations add `gg_deals_price`/`gg_deals_url` (the
+delete fails to prepare against the old schema — hit on the copy), then
+`itad.api_key` into `app_config` and `GG-004`'s live sync, then the `REL-001` gate.
+
+Measured locally against a copy of production: ITAD priced 494 entries with real
+shop names in 11 requests (was ~609 requests, 6× over the key's 100/5-minute
+budget); the full pricing pass — both providers — takes 16.5s against ~13 minutes
+before; 284 entries come out cheaper on GG.deals. Nothing promotes itself.
 
 ## Blockers
 
 - `DEPLOY-001`, `DEPLOY-002`, and `GG-004` need authorized `atlas` access in the
   executing session. Verified reachable from Ergaster on 2026-09-16
   (`ssh truenas_admin@192.168.3.174` → `truenas`; live DB `games` = 4033).
-- `DEPLOY-001` and `DEPLOY-002` are `human` tasks: they need Bobby at a terminal,
-  because `sudo docker` needs a TTY (`CLAUDE.md:94-95`).
+- `DEPLOY-001` and `DEPLOY-002` are `human` tasks because they restart the
+  production container, not because a TTY is required. That constraint was
+  measured false on 2026-09-16: `sudo -n docker` works over non-interactive SSH
+  for `truenas_admin` and `deploy.sh` ran without `-t`. `DEPLOY-001` was executed
+  with Bobby's explicit go-ahead; `DEPLOY-002` is authorized the same way.
 - `GG-002` needs `itad.api_key` present in the live `app_config`. Registered
-  2026-09-16 as `Nisaba_redux` and verified working against both endpoints used;
-  not yet loaded — that is Bobby's step in Settings.
+  2026-09-16 as `Nisaba_redux`, verified against both endpoints used, and held by
+  Bobby outside the repository; `DEPLOY-002` loads it during the deploy. It is
+  never committed, never written into evidence, and never in a changelog entry.
 - `GG-002`'s approach is settled by `GG-001` addendum 2: bulk ID resolution via
   `POST /lookup/id/shop/61/v1`, because the key's limit is 100 requests per
   5 minutes (Bobby's setup page; the docs claim 1000), which the per-entry loop

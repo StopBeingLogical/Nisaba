@@ -23,9 +23,11 @@ type GGDealsResult struct {
 	Errors   []string
 }
 
-// SyncGGDealsPricing fetches current and historical prices from the gg.deals API
-// for all wishlist entries that have a Steam App ID, updating both
-// best_current_price and historical_low in one batched pass.
+// SyncGGDealsPricing fetches the current gg.deals price for every wishlist
+// entry that has a Steam App ID, so it can be compared against ITAD's
+// authoritative price. It writes the gg_deals_* comparison columns only and
+// never touches best_current_*, the historical low, or price history — ITAD
+// owns those.
 // progress is called with (step label, done count, total count); it may be nil.
 func SyncGGDealsPricing(store *db.Store, progress func(step string, done, total int)) (GGDealsResult, error) {
 	var result GGDealsResult
@@ -99,7 +101,7 @@ func SyncGGDealsPricing(store *db.Store, progress func(step string, done, total 
 				continue
 			}
 
-			if err := applyGGDealsPrice(store, entry.id, entry.title, p, &result); err != nil {
+			if err := applyGGDealsComparison(store, entry.id, entry.title, p, &result); err != nil {
 				log.Printf("ggdeals apply %s: %v", entry.title, err)
 			}
 			fetched++
@@ -110,33 +112,23 @@ func SyncGGDealsPricing(store *db.Store, progress func(step string, done, total 
 	return result, nil
 }
 
-// applyGGDealsPrice writes the best current and historical prices to the DB.
-func applyGGDealsPrice(store *db.Store, entryID, title string, p *ggDealsGamePrices, result *GGDealsResult) error {
-	// Best current price: min of retail and keyshop current prices.
-	currentPrice, currentStore := bestGGPrice(p.Prices.CurrentRetail, "retail", p.Prices.CurrentKeyshops, "keyshop")
-	historicalPrice, historicalStore := bestGGPrice(p.Prices.HistoricalRetail, "retail", p.Prices.HistoricalKeyshops, "keyshop")
-
-	if currentPrice == 0 && historicalPrice == 0 {
+// applyGGDealsComparison writes the GG.deals price and page URL to the
+// comparison columns. The price is the lower of the retail and keyshop figures
+// GG.deals reports; the shop behind it is deliberately not recorded, since the
+// callout only claims that a cheaper price exists.
+func applyGGDealsComparison(store *db.Store, entryID, title string, p *ggDealsGamePrices, result *GGDealsResult) error {
+	currentPrice, _ := bestGGPrice(p.Prices.CurrentRetail, "retail", p.Prices.CurrentKeyshops, "keyshop")
+	if currentPrice == 0 {
 		result.NotFound++
 		return nil
 	}
 
-	update := db.WishlistPricingUpdate{ID: entryID}
-	if currentPrice > 0 {
-		src := "gg.deals/" + currentStore
-		update.BestCurrentPrice = &currentPrice
-		update.BestCurrentStore = &src
-		if p.URL != "" {
-			update.BestPriceURL = &p.URL
-		}
-	}
-	if historicalPrice > 0 {
-		src := "gg.deals/" + historicalStore
-		update.HistoricalLowPrice = &historicalPrice
-		update.HistoricalLowStore = &src
+	var url *string
+	if p.URL != "" {
+		url = &p.URL
 	}
 
-	if err := store.UpdateWishlistPricing(update); err != nil {
+	if err := store.UpdateWishlistGGDealsComparison(entryID, &currentPrice, url); err != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("update %q: %v", title, err))
 		return err
 	}

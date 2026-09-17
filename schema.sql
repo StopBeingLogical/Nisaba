@@ -174,6 +174,8 @@ CREATE TABLE IF NOT EXISTS wishlist_entries (
     itad_id             TEXT,
     best_current_price  REAL,
     best_current_store  TEXT,
+    gg_deals_price      REAL,
+    gg_deals_url        TEXT,
     historical_low_price REAL,
     historical_low_store TEXT,
     last_price_sync     TEXT,

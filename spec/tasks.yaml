@@ -153,7 +153,7 @@ tasks:
 
   - id: GG-002
     title: Implement the ruled price source
-    status: blocked
+    status: done
     capability: strong-coder
     environment: [local]
     depends_on: [GG-001]
@@ -163,7 +163,7 @@ tasks:
 
   - id: GG-003
     title: Map new store identifiers to display labels
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [GG-002]
@@ -173,7 +173,7 @@ tasks:
 
   - id: DEPLOY-002
     title: Deploy the price-source change
-    status: blocked
+    status: ready
     capability: human
     environment: [atlas]
     depends_on: [GG-003]
@@ -193,7 +193,7 @@ tasks:
 
   - id: GG-005
     title: Keep GG.deals as a comparison price source
-    status: blocked
+    status: done
     capability: strong-coder
     environment: [local]
     depends_on: [GG-002]
@@ -203,7 +203,7 @@ tasks:
 
   - id: GG-006
     title: Show the cheaper-on-GG.deals callout
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [local]
     depends_on: [GG-005]

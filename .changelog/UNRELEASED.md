@@ -9,6 +9,7 @@
 ---
 
 ## Top-Level Changes (Major only)
+- Switched the pricing provider to ITAD so `best_current_store` and price history hold real storefront names; GG.deals is kept as a comparison source and feeds a "cheaper on GG.deals" callout (2026-09-16)
 - Removed the dead `sqlc.yaml` + `queries/` scaffolding — `db/store.go` is the only query source; CLAUDE.md stack line updated to match (2026-09-16)
 - Fixed CLAUDE.md deploy/dev paths to ~/code/nisaba (dead Nextcloud scheme removed); git remotes corrected: origin → Forgejo SSH :2222, GitHub demoted to `github` mirror remote, token-embedded HTTP remote removed (2026-07-10)
 - Added Playnite-to-Nisaba automated library sync via PowerShell (2026-04-26)
@@ -21,6 +22,7 @@
 - Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
+- Added additive `gg_deals_price` / `gg_deals_url` columns to wishlist_entries, with `UpdateWishlistGGDealsComparison()` — GG.deals comparison only, ITAD keeps owning best_current_* and history (2026-09-16)
 - Narrowed the ListGames multi_store_owned EXISTS to a nested EXISTS — the JOIN-inside-EXISTS shape cost ~2.5s per library page under the pure-Go SQLite driver (2026-09-16)
 - Added FindGameByTitle() and makeSortTitle() for robust deduplication (2026-04-27)
 - Removed restrictive CHECK constraints from game_stores, wishlist_stores, and game_install_sources
@@ -36,6 +38,8 @@
 - Added migration: price_thresholds table with 4 seeded default rows (2026-06-28)
 
 ## handlers/ Changes
+- `storeShortLabel` maps ITAD storefront names (Humble Store → Humble, Epic Game Store → Epic, GreenManGaming → Green Man Gaming, Blizzard → Battle.net) and falls back to the raw value, never blank (2026-09-16)
+- Full sync now runs ITAD as the authoritative pricing step, then GG.deals as a comparison step; an unconfigured ITAD key logs and continues instead of failing the run (2026-09-16)
 - Added POST /api/sync/playnite for automated library updates (2026-04-26)
 - Added Playnite sync card to Sync UI with copyable PowerShell script
 - Added Sync API Secret to settings for securing automated syncs
@@ -52,6 +56,8 @@
 - Added 3 lowest prices display to wishlist detail page (2026-06-28)
 
 ## sync/ Changes
+- ITAD ID resolution is now one bulk `POST /lookup/id/shop/61/v1` per 100 Steam App IDs — 11 requests for the whole wishlist instead of ~609, which was 6× the key's 100-per-5-minute budget; the whole pricing pass dropped from ~13 minutes to 16.5 seconds (2026-09-16)
+- ITAD now writes `best_price_url` from the response's `current.url`, so deal links keep their affiliate tags rather than being reconstructed (2026-09-16)
 - Added standalone sync_playnite.ps1 PowerShell script for Playnite SDK (2026-04-26)
 - Added 'Steam Family Sharing' category filter to Playnite sync script
 - Added batching support (size: 50) and robust sanitization to Playnite sync

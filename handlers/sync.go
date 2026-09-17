@@ -135,21 +135,35 @@ func (h *Handler) SyncAll(w http.ResponseWriter, r *http.Request) {
 
 		h.cleanupWishlistLinks()
 
-		// 3. Pricing
-		log.Printf("sync-all: step — GG.deals pricing")
-		setStep("Fetching GG.deals prices…")
-		pResult, err := storesync.SyncGGDealsPricing(h.store, func(step string, done, total int) {
+		// 3. Pricing — ITAD is authoritative for price, storefront and history.
+		log.Printf("sync-all: step — ITAD pricing")
+		setStep("Fetching ITAD prices…")
+		pResult, err := storesync.SyncITADPricing(h.store, func(step string, done, total int) {
 			setStep(fmt.Sprintf("Pricing — %s (%d / %d)", step, done, total))
 		})
 		if err != nil {
-			msg := "Full sync failed during pricing: " + err.Error()
-			finish(msg)
-			finishLog("failed", err.Error(), ownerResult.Added+wlResult.Added, 0)
-			return
+			log.Printf("sync-all: ITAD pricing skipped: %v", err)
+			pResult = storesync.PricingResult{}
 		}
-		log.Printf("sync-all: GG.deals done — %d updated, %d not found, %d errors", pResult.Updated, pResult.NotFound, len(pResult.Errors))
+		log.Printf("sync-all: ITAD done — %d updated, %d not found, %d errors", pResult.Updated, pResult.NotFound, len(pResult.Errors))
 		for _, e := range pResult.Errors {
 			log.Printf("sync-all pricing: %s", e)
+		}
+
+		// GG.deals is retained as a comparison source only — it fills its own
+		// columns and never writes ITAD's.
+		log.Printf("sync-all: step — GG.deals comparison")
+		setStep("Fetching GG.deals comparison prices…")
+		ggResult, ggErr := storesync.SyncGGDealsPricing(h.store, func(step string, done, total int) {
+			setStep(fmt.Sprintf("GG.deals — %s (%d / %d)", step, done, total))
+		})
+		if ggErr != nil {
+			log.Printf("sync-all: GG.deals comparison skipped: %v", ggErr)
+		} else {
+			log.Printf("sync-all: GG.deals comparison done — %d priced, %d not found, %d errors", ggResult.Updated, ggResult.NotFound, len(ggResult.Errors))
+			for _, e := range ggResult.Errors {
+				log.Printf("sync-all gg.deals: %s", e)
+			}
 		}
 
 		log.Printf("sync-all: step — reseller pricing")

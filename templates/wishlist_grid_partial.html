@@ -56,6 +56,9 @@
                     ${{ printf "%.2f" .BestCurrentPrice.Float64 }}
                 </div>
                 <div class="text-xs text-gray-500">{{ storeShortLabel .BestCurrentStore.String }}</div>
+                {{ if and .GGDealsPrice.Valid .BestCurrentPrice.Valid (lt .GGDealsPrice.Float64 .BestCurrentPrice.Float64) }}
+                <div class="inline-block text-xs px-1.5 py-0.5 mt-0.5 rounded font-medium bg-emerald-500/15 text-emerald-400">Cheaper on GG.deals</div>
+                {{ end }}
                 {{ if .HistoricalLowPrice.Valid }}
                 <div class="text-xs text-gray-600 mt-0.5">Low: ${{ printf "%.2f" .HistoricalLowPrice.Float64 }} <span class="text-gray-700">{{ storeShortLabel .HistoricalLowStore.String }}</span></div>
                 {{ end }}

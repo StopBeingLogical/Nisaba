@@ -360,14 +360,26 @@ func storeShortLabel(s string) string {
 		return "Steam"
 	case "gog":
 		return "GOG"
-	case "epic":
+	case "epic", "epic game store", "epic games store":
 		return "Epic"
-	case "amazon":
+	case "amazon", "amazon games":
 		return "Amazon"
-	case "humble":
+	case "humble", "humble store", "humble bundle":
 		return "Humble"
 	case "fanatical":
 		return "Fanatical"
+	case "greenmangaming", "green man gaming":
+		return "Green Man Gaming"
+	case "ea store", "ea app":
+		return "EA Store"
+	case "microsoft store", "windows store":
+		return "Microsoft Store"
+	case "ubisoft store", "ubisoft connect", "uplay":
+		return "Ubisoft Store"
+	case "blizzard", "battle.net", "battlenet":
+		return "Battle.net"
+	case "itch.io", "itchio":
+		return "itch.io"
 	case "":
 		return "—"
 	default:

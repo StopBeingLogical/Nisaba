@@ -213,6 +213,8 @@ func runMigrations(sqlDB *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_sync_errors_type ON sync_errors (sync_type, id DESC)`,
 		`ALTER TABLE wishlist_entries ADD COLUMN best_price_url TEXT`,
+		`ALTER TABLE wishlist_entries ADD COLUMN gg_deals_price REAL`,
+		`ALTER TABLE wishlist_entries ADD COLUMN gg_deals_url TEXT`,
 		`CREATE TABLE IF NOT EXISTS mystery_pack_sites (
 			id       TEXT PRIMARY KEY,
 			name     TEXT NOT NULL,

@@ -164,6 +164,8 @@ type WishlistRow struct {
 	Currency                string
 	BestCurrentPrice        sql.NullFloat64
 	BestCurrentStore        sql.NullString
+	GGDealsPrice            sql.NullFloat64
+	GGDealsURL              sql.NullString
 	HistoricalLowPrice      sql.NullFloat64
 	HistoricalLowStore      sql.NullString
 	TargetPrice             sql.NullFloat64
@@ -195,6 +197,8 @@ type WishlistDetailRow struct {
 	BestCurrentPrice     sql.NullFloat64
 	BestCurrentStore     sql.NullString
 	BestPriceURL         sql.NullString
+	GGDealsPrice         sql.NullFloat64
+	GGDealsURL           sql.NullString
 	HistoricalLowPrice   sql.NullFloat64
 	HistoricalLowStore   sql.NullString
 	LastPriceSync        sql.NullString
