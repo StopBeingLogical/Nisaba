@@ -118,8 +118,11 @@ write, so no statement is made here about how the sync upserts.
 
 ## Note on the client secret
 
-The refresh call requires the Galaxy client secret. It is public (it is a
-constant in Heroic's open-source `gogdl`), but committing it here would violate
+The refresh call requires the Galaxy client secret — verified, not assumed:
+the same call without `client_secret` returns
+`invalid_client: The client credentials are invalid`. There is no secret-free
+refresh. The secret is public (it is a constant in Heroic's open-source
+`gogdl`), but committing it here would violate
 `ACCEPTANCE.md`'s "no API key or secret appears in the repository". It
 therefore belongs in `app_config` as `gog.client_secret`, set once by hand,
 with a set/unset boolean in the settings view per the existing convention. This
