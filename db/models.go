@@ -52,7 +52,7 @@ type GameListRow struct {
 	GenresRaw             sql.NullString // comma-separated
 	TagsRaw               sql.NullString // comma-separated
 	OwnedStoresRaw        sql.NullString // comma-separated
-	MultiStoreOwned       bool           // true if another game with the same IGDB ID is owned in a different store
+	MultiStoreOwned       bool           // true if the game is owned on more than one store
 }
 
 func (g GameListRow) Artwork() Artwork        { return ParseArtwork(g.ArtworkRaw) }

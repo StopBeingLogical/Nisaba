@@ -24,6 +24,7 @@
 - Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
+- `multi_store_owned` now counts the game's own owned store links instead of looking for another game row sharing its `igdb_id`. The old test reported 796 games as owned on multiple stores where 102 are — 786 false positives and 92 false negatives (2026-09-17)
 - Added additive `gg_deals_price` / `gg_deals_url` columns to wishlist_entries, with `UpdateWishlistGGDealsComparison()` — GG.deals comparison only, ITAD keeps owning best_current_* and history (2026-09-16)
 - Narrowed the ListGames multi_store_owned EXISTS to a nested EXISTS — the JOIN-inside-EXISTS shape cost ~2.5s per library page under the pure-Go SQLite driver (2026-09-16)
 - Added FindGameByTitle() and makeSortTitle() for robust deduplication (2026-04-27)

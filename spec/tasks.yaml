@@ -345,6 +345,48 @@ tasks:
     outcome: Bobby confirms, then rsync and deploy.sh put the Playnite script skip and its observable logging on Atlas. The embedded script only reaches the browser through the binary, so this deploy is what makes the change real for him.
     acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/"]
 
+  # ── Round 2026-09-17 (data cleanup) — rulings in spec/PRODUCT-5.md ──────
+
+  - id: DATA-001
+    title: Correct the multiple-stores indicator
+    status: done
+    capability: bounded-coder
+    environment: [local]
+    depends_on: [AUDIT-001]
+    scope: [db/store.go, db/models.go, spec/evidence/DATA-001.md]
+    outcome: multi_store_owned answers whether the game is owned on more than one store, not whether another game row shares its igdb_id. Measured 2026-09-17 (AUDIT-001): the sibling-row test flags 796 games where 102 are genuinely on 2+ stores — 786 false positives and 92 false negatives. Count owned game_stores links instead; idx_game_stores_game_id_owned serves it as a covering index. Correct the field comment in db/models.go:55, which describes the old semantics. This must be deployed before DATA-002 removes the duplicate rows, because those rows are what the old query was counting.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "! grep -q 'g2.id != g.id' db/store.go"]
+
+  - id: DEPLOY-007
+    title: Deploy the corrected multiple-stores indicator
+    status: ready
+    capability: human
+    environment: [atlas]
+    depends_on: [DATA-001]
+    scope: [spec/evidence/DEPLOY-007.md]
+    outcome: Bobby confirms, then rsync and deploy.sh put the corrected indicator on Atlas before the dedupe runs, so the flag is never zero for every game in the gap. Confirm the library still serves under 1 second and that the indicator now reports ~102 games rather than ~796.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q '102' spec/evidence/DEPLOY-007.md"]
+
+  - id: DATA-002
+    title: Merge and delete the duplicate game rows
+    status: blocked
+    capability: human
+    environment: [atlas]
+    depends_on: [DEPLOY-007]
+    scope: [spec/evidence/DATA-002.md]
+    outcome: One row survives per identity (igdb_id where set, else exact title), preferring a row that holds owned store links and then the earliest; the doomed rows' 266 store links, 1865 genres and 49 content rows are moved onto it, with the 68 rows holding playtime and 67 holding last_played. Then the surplus 718 rows are deleted. By hand, in one transaction, with backups, foreign keys on, and before/after counts recorded; migrations are additive only so this cannot be a migration. No user-authored field (favourite, rating, notes, play_status, is_installed) is set on any doomed row, and no wishlist entry or parent_id points at one.
+    acceptance: ["grep -q 'before' spec/evidence/DATA-002.md", "grep -q 'after' spec/evidence/DATA-002.md", "scripts/spec-validate.sh"]
+
+  - id: DATA-003
+    title: Repair the remaining data debris
+    status: blocked
+    capability: human
+    environment: [atlas]
+    depends_on: [AUDIT-001]
+    scope: [spec/evidence/DATA-003.md]
+    outcome: Three one-off repairs against the live database, by hand, with before and after counts. (a) Text: restore the letters in the 3 mojibake titles, trim and de-double the 13 whitespace-damaged titles, and NULL the 3 9998-12-30 sentinel release dates. (b) Delete the 748 owned=0 game_stores rows, which no query reads — all 12 reads filter owned=1 — taking the table from 4402 to 3654. (c) Delete the 131 sync_errors rows from 2026-03-12..03-19, 130 proton and 1 pricing, left behind by the ProtonDB scraper that lost its caller in June. The 124 Steam Family Sharing games are NOT touched — Bobby did not select them and they stay as an unruled question.
+    acceptance: ["grep -q 'before' spec/evidence/DATA-003.md", "grep -q 'after' spec/evidence/DATA-003.md", "scripts/spec-validate.sh"]
+
   # ── Audit 2026-09-17 — findings in spec/evidence/AUDIT-001.md ────────────
 
   - id: AUDIT-001

@@ -104,11 +104,8 @@ SELECT
     (SELECT GROUP_CONCAT(genre) FROM game_genres WHERE game_id = g.id) AS genres,
     (SELECT GROUP_CONCAT(tag)   FROM game_tags   WHERE game_id = g.id) AS tags,
     (SELECT GROUP_CONCAT(store) FROM game_stores WHERE game_id = g.id AND owned = 1) AS owned_stores,
-    CASE WHEN g.igdb_id IS NOT NULL AND EXISTS (
-        SELECT 1 FROM games g2
-        WHERE g2.igdb_id = g.igdb_id AND g2.id != g.id
-          AND EXISTS (SELECT 1 FROM game_stores gs2 WHERE gs2.game_id = g2.id AND gs2.owned = 1)
-    ) THEN 1 ELSE 0 END AS multi_store_owned
+    CASE WHEN (SELECT COUNT(*) FROM game_stores gs WHERE gs.game_id = g.id AND gs.owned = 1) >= 2
+         THEN 1 ELSE 0 END AS multi_store_owned
 FROM games g %s
 WHERE %s
 ORDER BY %s`, joins, strings.Join(where, " AND "), orderBy)
