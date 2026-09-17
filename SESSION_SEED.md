@@ -87,7 +87,7 @@ Test: could a different model, reading only these files, resume exactly here?
 |---|---|---|
 | About to remove or raise `sqlDB.SetMaxOpenConns(1)` | SQLite is single-writer; more connections cause `SQLITE_BUSY` even in WAL mode | `CLAUDE.md:88-89` |
 | About to write a migration that DROPs, renames, or updates existing rows | Migrations are additive and idempotent only | `CLAUDE.md:91-92` |
-| About to run `sudo docker` over non-interactive SSH | Needs a TTY; always fails. Use `deploy.sh` or `ssh -t` | `CLAUDE.md:94-95` |
+| About to reach for `ssh -t` because "`sudo` needs a TTY" | It does not here: `sudo` is passwordless for `truenas_admin`, and a plain `ssh host "bash deploy.sh"` ran clean for `DEPLOY-001` (2026-09-16) | `CLAUDE.md:94-95`, verified live |
 | About to rsync without `--exclude='._*'` | macOS resource forks pollute the server | `CLAUDE.md:103-104` |
 | About to render a secret as `value=` in HTML | Use a boolean `FooSet bool` and placeholder text | `CLAUDE.md:135` |
 | About to deploy as part of an implementation task | Deployment is always its own `atlas` task and stops for Bobby | Bobby, 2026-08-01 |

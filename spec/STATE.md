@@ -22,10 +22,11 @@ dashboard 0.006s and wishlist 0.235s. Reproduced locally 2026-09-16 at 2.55s /
 2.48s at page 1, 11.76s of 11.90s at offset 4000. Not the `GROUP_CONCAT`
 subqueries (7–23ms) and not the `OFFSET` scan (~10ms). The same statement under
 C SQLite takes 9ms on the same file (`evidence/PERF-003.md`).**
-- **Fixed and verified locally 2026-09-16** (`PERF-005` / `PERF-006`): page 1
-  2.554s → 0.048s, page 21 12.099s → 0.074s, row output identical over all 4033
-  rows, and the handler's >100ms timing line no longer fires. Atlas is unmeasured
-  until `PERF-007`.
+- **Fixed, deployed, and verified 2026-09-16** (`PERF-005` → `PERF-007`): locally
+  page 1 2.554s → 0.048s and page 21 12.099s → 0.074s with row output identical
+  over all 4033 rows; live on Atlas page 1 5.63s → **0.081s** and page 2 9.31s →
+  **0.085s**, three runs each, against a <1s target. The handler's >100ms timing
+  line no longer fires.
 - `sqlc.yaml` and 503 lines of `queries/*.sql` described queries no code path
 executed; deleted by `BASE-002` (2026-09-16), so `db/store.go` is the only query
 source.
@@ -34,8 +35,10 @@ source.
 
 ## Next task
 
-`DEPLOY-001` — Bobby confirms, then rsync + `deploy.sh` put the library fix on
-Atlas, and `PERF-007` verifies sub-second against the deployed instance. Nothing
+The PERF half of the round is **complete in production**. The GG half is next:
+`GG-002` (ITAD authoritative, scorched earth on both columns, `best_price_url`
+from `current.url`) once `itad.api_key` is in the live config, then `GG-003`,
+`GG-005`, `GG-006`, `DEPLOY-002`, `GG-004`, and `REL-001` closes the gate. Nothing
 promotes itself.
 
 The GG chain is fully ruled as of 2026-09-16: `GG-002` (ITAD authoritative;

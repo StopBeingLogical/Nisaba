@@ -123,7 +123,7 @@ tasks:
 
   - id: DEPLOY-001
     title: Deploy the library performance fix
-    status: blocked
+    status: done
     capability: human
     environment: [atlas]
     depends_on: [PERF-006]
@@ -133,7 +133,7 @@ tasks:
 
   - id: PERF-007
     title: Verify the sub-second target on the deployed instance
-    status: blocked
+    status: done
     capability: bounded-coder
     environment: [network]
     depends_on: [DEPLOY-001]

@@ -100,8 +100,10 @@ sqlite3 /mnt/MemoryAlpha/nisaba/data/nisaba.db "SELECT ..."
 ### Additive migrations only
 Schema changes go in `runMigrations()` in `main.go` as `ALTER TABLE ADD COLUMN` statements. They must be idempotent — duplicate-column errors are silently ignored. Never DROP or rename columns. Never modify existing rows in migrations.
 
-### No `sudo docker` via non-interactive SSH
-`sudo` requires a TTY for password input. Always use `deploy.sh` (which handles this) or an interactive `-t` SSH session. Inline `ssh host "sudo docker ..."` will always fail.
+### `sudo docker` over SSH — no TTY needed (corrected 2026-09-16)
+`sudo` is passwordless for `truenas_admin`, so inline `ssh host "sudo docker ..."` works: the `DEPLOY-001` run executed `ssh truenas_admin@192.168.3.174 "cd /mnt/MemoryAlpha/nisaba/source && bash deploy.sh"` with no `-t` and no prompt, and `deploy.sh` itself calls `sudo docker rm -f` and `sudo docker compose up --build -d`. The earlier note here (and the matching `SESSION_SEED.md` tripwire) claimed the opposite and was wrong.
+
+If a password prompt ever appears, fall back to an interactive `ssh -t` session or plain `bash deploy.sh` in a terminal.
 
 ### Shell passwords need single quotes
 When passing passwords to `docker exec` or any shell command, always use single quotes to prevent special characters (`!`, `$`, `@`, etc.) from being interpreted:
