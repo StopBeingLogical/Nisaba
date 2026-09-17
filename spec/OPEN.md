@@ -17,7 +17,11 @@ deleted.
   `BASE-002`) and an `enrichment/` directory the repository does not contain. All
   inert today — only `templates/*`, `static/*` and `schema.sql` are embedded
   (`main.go:24-30`) — but any deleted file under them that a build reaches would
-  fail the same way. Options I can see, not a recommendation: (a) add `--delete`
+  fail the same way. **Measured at `DEPLOY-005`:** every `*.go` file on the server
+  that the repository lacks is now a `._*` AppleDouble resource fork, which Go
+  ignores, so no stale Go source is outstanding; the deleted paths that remain
+  hold no `.go` files. The rsync also leaves the server's own git checkout at
+  `40c8491` with a dirty tree, which the build never reads. Options I can see, not a recommendation: (a) add `--delete`
   to the documented rsync (the existing `--exclude` patterns still protect `.git`,
   `*.db` and `imgcache` from deletion); (b) keep the command as it is and remove
   stale paths by hand at each deploy; (c) something else. Not derived into a task.

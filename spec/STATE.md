@@ -139,9 +139,11 @@ was re-run under `sudo -n`, which is how the root-running container writes it
 too. Backups of all three row sets are on Ergaster under `/tmp/gog005-backup-*`
 (`evidence/GOGL-005.md`).
 
-**Caveat until the deploy:** the running binary is the pre-round build, so a
-Full sync still recreates those entries — the DELETE is idempotent, but the rows
-come back until `DEPLOY-004` replaces the writer.
+**Caveat until `DEPLOY-004` (now closed):** the binary running at the time was
+the pre-round build, so a Full sync could recreate those entries. One ran on that
+build — `sync_log` id 86, `2026-09-17 00:33:11`, 736 added — and could not have:
+the GOG step was gated on the recorded expiry, so it logged a skip and added
+nothing. The writer has since been replaced, so nothing attempts it now.
 
 **`DEPLOY-004` completed 2026-09-16** (commit `8e33a46`, image
 `d0c5bc6d`). The deployed container logs both schedules, and the GOG one is new
@@ -173,15 +175,18 @@ other libraries"):
   shares the type, so the two are told apart by content. `mystery_packs` keeps its
   invalid type by ruling (`evidence/GOGL-007.md`).
 
-Both are **not deployed**: the Playnite script only reaches a browser through the
-embedded template, so `DEPLOY-005` is what makes either change real.
+**`DEPLOY-005` completed 2026-09-17** (commit `0e3286c`, image
+`sha256:76bd4b22c8bb`), on Bobby's confirmation. Both new strings are in the
+running binary — the template is embedded, so that is the proof they are served,
+not the rendered page (`/sync` is behind auth) — and the server tree was checked
+before the container was killed, because `deploy.sh` removes it *before* it
+builds. `/`, `/library` and `/wishlist` are 200; wishlist 672 with 0 GOG entries,
+`game_stores` gog rows 1037, nothing mid-sync (`evidence/DEPLOY-005.md`).
 
 ## Next task
 
-**`DEPLOY-005` — deploy the Playnite corrections** (promoted to `ready`
-2026-09-16; both dependencies are `done`). It is `human`/`atlas`, so it stops for
-Bobby's confirmation. Until it runs, a Playnite sync still posts GOG rows and
-still records nothing.
+None. The round is complete and deployed, and `scripts/spec-next.sh` prints
+nothing.
 
 Two things are **scheduled or pending rather than observed**:
 

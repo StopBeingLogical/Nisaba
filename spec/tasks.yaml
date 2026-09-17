@@ -337,7 +337,7 @@ tasks:
 
   - id: DEPLOY-005
     title: Deploy the Playnite corrections
-    status: ready
+    status: done
     capability: human
     environment: [atlas]
     depends_on: [GOGL-006, GOGL-007]
