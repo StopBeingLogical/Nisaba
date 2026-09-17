@@ -89,6 +89,12 @@ Two constraints are specific to this round:
 - **Reworking the Playnite path.** Steam, Epic, Amazon, Xbox, PlayStation and
   Battle.net ownership keep arriving exactly as they do now, script and all.
   Only GOG leaves that dependency.
+  **Confirmed 2026-09-16 ("no need for playnite sync, at least for GOG. It can
+  still be useful for all the other libraries"):** GOG is not Playnite's job any
+  more, and Playnite remains the path for the other stores — so an observable
+  Playnite run still matters, and the `sync_log` constraint defect in `OPEN.md`
+  is a live problem rather than a GOG one. GOG itself is unaffected: its sync
+  records to `sync_log` as type `ownership`, which the schema allows.
 - **Deleting the dead Heroic code.** It is recorded as dead above; removing it
   is not part of this round.
 - **Manual wishlist entries.** Users can still add a non-Steam wishlist entry by
