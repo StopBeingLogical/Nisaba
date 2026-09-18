@@ -14,11 +14,20 @@
 
         <div class="ml-auto flex items-center gap-2">
             <button hx-post="/match-review/find"
-                    hx-target="#match-find-status"
-                    hx-swap="outerHTML"
-                    class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                    hx-target="#match-job-status"
+                    hx-swap="innerHTML"
+                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-100 font-semibold rounded-lg text-sm transition">
                 Find candidates
             </button>
+            {{ if or .Counts.Yes .Counts.No }}
+            <button hx-post="/match-review/apply"
+                    hx-target="#match-job-status"
+                    hx-swap="innerHTML"
+                    hx-confirm="Apply your saved verdicts? Games marked yes are linked to their IGDB match and re-enriched; games marked no are searched again with the rejected entry excluded. This writes to your library."
+                    class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                Apply verdicts ({{ .Counts.Yes }} yes, {{ .Counts.No }} no)
+            </button>
+            {{ end }}
         </div>
     </div>
 
@@ -34,7 +43,7 @@
             <strong class="text-gray-200">search IGDB</strong> on the row and pick the right entry;
             choosing a match saves it and marks the row yes straight away.
         </p>
-        <div class="min-w-[18rem]">{{ template "sync_status_partial.html" .FindStatus }}</div>
+        <div class="min-w-[18rem]" id="match-job-status">{{ template "sync_status_partial.html" .FindStatus }}</div>
     </div>
 
     <!-- ── Filter tabs ────────────────────────────────────────── -->

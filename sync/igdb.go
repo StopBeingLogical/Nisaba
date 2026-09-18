@@ -413,6 +413,72 @@ func CandidateFromGame(gameID string, g IGDBGame, confidence string, score float
 	}
 }
 
+// enrichFromIGDB writes one IGDB entry onto a game: the IGDB id, cover artwork,
+// summary, release date, developer, publisher and genres, then marks the game
+// 'matched' (which is what takes it out of the review queue).
+//
+// Both the enrichment pipeline and the review page's true-up go through this, so
+// a match applied by hand is written identically to one found by a search and the
+// two cannot drift apart.
+func enrichFromIGDB(store *db.Store, gameID string, match IGDBGame) error {
+	coverURL := match.CoverURL()
+	artJSON, _ := json.Marshal(buildArtwork(coverURL, coverURL, "", "", "", "igdb"))
+
+	var summary, releaseDate, developer, publisher *string
+	if match.Summary != "" {
+		s := match.Summary
+		summary = &s
+	}
+	if rd := match.ReleaseDate(); rd != "" {
+		releaseDate = &rd
+	}
+	if d := match.DeveloperName(); d != "" {
+		developer = &d
+	}
+	if name := match.PublisherName(); name != "" {
+		publisher = &name
+	}
+
+	if err := store.EnrichGame(db.EnrichGameParams{
+		ID:          gameID,
+		IGDBId:      match.ID,
+		ArtworkJSON: string(artJSON),
+		Description: summary,
+		ReleaseDate: releaseDate,
+		Developer:   developer,
+		Publisher:   publisher,
+	}); err != nil {
+		return err
+	}
+	for _, genre := range match.GenreNames() {
+		_ = store.UpsertGenre(gameID, genre)
+	}
+	return nil
+}
+
+// bestCandidate picks the highest-scoring IGDB result for a title, skipping any
+// entry the owner has already rejected for this game.
+//
+// The exclusion is what makes the match-review page's "try again" meaningful: the
+// search is deterministic, so without it a re-match would offer the same wrong
+// answer it was just told to discard. A zero score means nothing usable was left.
+func bestCandidate(title, gameID string, results []IGDBGame, known, rejected map[int64]bool) (db.MatchCandidate, float64) {
+	best := db.MatchCandidate{GameID: gameID, Confidence: "none"}
+	bestScore := 0.0
+	for i := range results {
+		if rejected[results[i].ID] {
+			continue
+		}
+		score, label := scoreMatch(title, results[i].Name)
+		if score <= bestScore {
+			continue
+		}
+		bestScore = score
+		best = CandidateFromGame(gameID, results[i], label, score, known[results[i].ID])
+	}
+	return best, bestScore
+}
+
 // bestMatch returns the best IGDB result for the given title. Among exact
 // name matches, PC (Windows, platform 6) entries are preferred over other
 // platforms to avoid matching mobile/console-only variants.
@@ -601,40 +667,10 @@ func EnrichLibrary(store *db.Store, client *IGDBClient, progressFn func(EnrichPr
 			continue
 		}
 
-		// Build cover artwork from IGDB
-		coverURL := match.CoverURL()
-		artJSON, _ := json.Marshal(buildArtwork(coverURL, coverURL, "", "", "", "igdb"))
-
-		var summary, releaseDate, developer, publisher *string
-		if match.Summary != "" {
-			s := match.Summary
-			summary = &s
-		}
-		if rd := match.ReleaseDate(); rd != "" {
-			releaseDate = &rd
-		}
-		if d := match.DeveloperName(); d != "" {
-			developer = &d
-		}
-		if name := match.PublisherName(); name != "" {
-			publisher = &name
-		}
-
-		if err := store.EnrichGame(db.EnrichGameParams{
-			ID:          g.ID,
-			IGDBId:      match.ID,
-			ArtworkJSON: string(artJSON),
-			Description: summary,
-			ReleaseDate: releaseDate,
-			Developer:   developer,
-			Publisher:   publisher,
-		}); err != nil {
+		if err := enrichFromIGDB(store, g.ID, *match); err != nil {
 			p.Errors++
 		} else {
 			p.Matched++
-			for _, genre := range match.GenreNames() {
-				_ = store.UpsertGenre(g.ID, genre)
-			}
 		}
 
 		p.Done++
@@ -833,6 +869,12 @@ func FindMatchCandidates(store *db.Store, client *IGDBClient, progressFn func(En
 	if err != nil {
 		return fmt.Errorf("matched ids: %w", err)
 	}
+	// Entries the owner already rejected are never offered again, so a re-run
+	// cannot resurrect the candidate that was just voted down.
+	rejected, err := store.RejectedIGDBIDs()
+	if err != nil {
+		return fmt.Errorf("rejected ids: %w", err)
+	}
 
 	p := EnrichProgress{Total: len(games)}
 	ticker := time.NewTicker(250 * time.Millisecond) // 4 req/sec, as elsewhere
@@ -841,20 +883,12 @@ func FindMatchCandidates(store *db.Store, client *IGDBClient, progressFn func(En
 	for _, g := range games {
 		<-ticker.C
 
-		candidate := db.MatchCandidate{GameID: g.ID, Confidence: "none"}
+		candidate, bestScore := db.MatchCandidate{GameID: g.ID, Confidence: "none"}, 0.0
 		results, err := client.SearchGame(g.Title)
 		if err != nil {
 			p.Errors++
 		} else {
-			bestScore := 0.0
-			for i := range results {
-				score, label := scoreMatch(g.Title, results[i].Name)
-				if score <= bestScore {
-					continue
-				}
-				bestScore = score
-				candidate = CandidateFromGame(g.ID, results[i], label, score, known[results[i].ID])
-			}
+			candidate, bestScore = bestCandidate(g.Title, g.ID, results, known, rejected[g.ID])
 			if bestScore > 0 {
 				p.Matched++
 			}

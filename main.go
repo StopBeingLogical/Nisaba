@@ -164,6 +164,8 @@ func main() {
 		r.Get("/match-review/status", h.MatchReviewStatus)
 		r.Get("/match-review/{id}/search", h.MatchReviewSearch)
 		r.Post("/match-review/{id}/candidate", h.MatchReviewSetCandidate)
+		r.Post("/match-review/apply", h.MatchReviewApply)
+		r.Get("/match-review/apply/status", h.MatchReviewApplyStatus)
 
 		// GOG token import
 		r.Post("/auth/gog/exchange", h.GOGAuthExchange)

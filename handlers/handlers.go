@@ -50,6 +50,17 @@ type matchFindState struct {
 	lastMsg string
 }
 
+// matchApplyState tracks a running true-up — the one job in the review flow that
+// writes to `games`, so it has its own phase text as well as its own counters.
+type matchApplyState struct {
+	mu      sync.Mutex
+	running bool
+	done    int
+	total   int
+	phase   string
+	lastMsg string
+}
+
 // pageTemplates lists every template that defines a "content" block (full page).
 var pageTemplates = []string{
 	"dashboard.html",
@@ -86,6 +97,7 @@ type Handler struct {
 	enrichment  enrichState
 	syncAll     syncAllState
 	matchFind   matchFindState
+	matchApply  matchApplyState
 	mysteryPack mysteryPackState
 	dataDir     string
 }

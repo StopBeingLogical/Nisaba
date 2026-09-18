@@ -2127,6 +2127,39 @@ WHERE g.id = ?`, gameID).Scan(&r.ID, &r.Title, &r.ArtworkRaw, &r.StoreInfo,
 	return r, err
 }
 
+// RecordMatchRejection remembers that the owner ruled out an IGDB entry for a
+// game, so a later search never offers it again. Re-recording is a no-op.
+func (s *Store) RecordMatchRejection(gameID string, igdbID int64) error {
+	_, err := s.db.Exec(`
+INSERT INTO match_review_rejections (game_id, igdb_id)
+VALUES (?, ?)
+ON CONFLICT(game_id, igdb_id) DO NOTHING`, gameID, igdbID)
+	return err
+}
+
+// RejectedIGDBIDs returns the rejected entries keyed by game, so a search can
+// skip them in one lookup per game rather than one query per candidate.
+func (s *Store) RejectedIGDBIDs() (map[string]map[int64]bool, error) {
+	rows, err := s.db.Query(`SELECT game_id, igdb_id FROM match_review_rejections`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]map[int64]bool{}
+	for rows.Next() {
+		var gameID string
+		var igdbID int64
+		if err := rows.Scan(&gameID, &igdbID); err != nil {
+			return nil, err
+		}
+		if out[gameID] == nil {
+			out[gameID] = map[int64]bool{}
+		}
+		out[gameID][igdbID] = true
+	}
+	return out, rows.Err()
+}
+
 // MatchedIGDBIDs returns the igdb_ids already matched to a game, so the review
 // page can warn when a candidate is already in the library.
 func (s *Store) MatchedIGDBIDs() (map[int64]bool, error) {

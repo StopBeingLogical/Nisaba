@@ -517,6 +517,28 @@ tasks:
     outcome: The candidate search skips decided rows, so the 86 rows already ruled on show a bare pairing with no evidence on the Yes/No tabs. Fill it without relaxing that guard — look the candidate up by the igdb_id already stored and update only the four evidence columns, so no candidate, confidence or verdict can move. Do not deploy: the application never performs this operation. Verify by diffing every non-evidence column across all 328 rows before and after, and record how much of the IGDB shortfall is genuinely absent data.
     acceptance: ["grep -q 'MATCH-003' spec/evidence/MATCH-003.md", "grep -q 'all 328 rows identical in every non-evidence column' spec/evidence/MATCH-003.md", "grep -q '185' spec/evidence/MATCH-003.md"]
 
+  # ── Round 2026-09-17 (fifth pass) — ruling in spec/PRODUCT-9.md ──────────
+
+  - id: MATCH-004
+    title: True-up that applies saved match verdicts to the library
+    status: done
+    capability: strong-coder
+    environment: [local]
+    depends_on: [MATCH-003]
+    scope: [sync/match_apply.go, sync/igdb.go, db/store.go, schema.sql, handlers/match_review.go, handlers/handlers.go, handlers/sync.go, templates/match_review.html, templates/sync_status_partial.html, main.go, spec/evidence/MATCH-004.md]
+    outcome: Turn saved verdicts into changes. A yes links the game to the candidate it was shown and re-enriches it; do not reuse the old /review path (SetIGDBMatch + EnqueueEnrichment), which marks the game manual and enqueues into a queue nothing reads — share the pipeline's own per-game write instead so a hand-applied match cannot drift from a searched one. A no records the rejected igdb_id so it is never offered again, searches afresh excluding it, and returns the row to the undecided queue; a no must never write to games. The run must be re-runnable and a second pass over the same verdicts must be a no-op. While here, fix the Find candidates status wiring: its target id exists nowhere and the shared status partial polls a hardcoded /sync/status.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'match_review_rejections' schema.sql", "grep -q 'MATCH-004' spec/evidence/MATCH-004.md", "grep -q '0 of 36 changed' spec/evidence/MATCH-004.md"]
+
+  - id: DEPLOY-011
+    title: Deploy the true-up and apply the first verdicts on live
+    status: done
+    capability: human
+    environment: [atlas]
+    depends_on: [MATCH-004]
+    scope: [spec/evidence/DEPLOY-011.md]
+    outcome: Check the server tree, deploy, and confirm the startup migration created match_review_rejections. Take a backup, then run the true-up for the verdicts already given, and record the before/after for linked games, re-matched rows, rejections and queue counts. Confirm no row's stored candidate equals a rejected id and that integrity checks pass. Remove the runner from the container, the host and the tree.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q '912505fd941d' spec/evidence/DEPLOY-011.md", "grep -q 'rejections recorded' spec/evidence/DEPLOY-011.md"]
+
   - id: DEPLOY-010
     title: Deploy the evidence columns and re-seed the candidate queue
     status: done

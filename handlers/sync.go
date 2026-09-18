@@ -21,6 +21,9 @@ type syncStatusData struct {
 	Running      bool
 	Message      string
 	Detail       string
+	// PollURL is the endpoint this status fragment polls while a job runs. Empty
+	// means the sync dashboard's own /sync/status.
+	PollURL string
 	Step         string
 	StepDone     int
 	StepTotal    int

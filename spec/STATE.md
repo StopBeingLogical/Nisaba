@@ -44,13 +44,21 @@ reported the queue needed inspecting one row at a time. The measurement found wh
 `MATCH-002` and `DEPLOY-010` fixed that — every candidate now carries IGDB's
 summary, genres, platforms and a link, and every row has its own IGDB search box.
 All 99 undecided candidates hold evidence and the re-seed moved **0** pairings.
-See below.
+`MATCH-003` then filled the same evidence on the 86 rows already ruled on. See below.
 
-`OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
+A **fifth pass opened and closed the same day** (`PRODUCT-9.md`) — the true-up
+`PRODUCT-7` deferred. `MATCH-004` and `DEPLOY-011` turn saved verdicts into
+library changes: **50 games linked and re-enriched**, 31 rejected candidates
+replaced with a different offer, 5 with nothing else to offer, 0 errors. This is
+the first review path that writes to `games`. See below.
+
+`OPEN.md` holds **four unanswered entries** — the `sync_log` CHECK still
 rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
-should use `--delete`, and the three dormant fetchers (`SyncSteamDeckStatus`,
-`SyncProtonRatings`, `SyncSteamCrossRefs`) that nothing calls. Nothing may derive
-work from any of them; they need a ruling first.
+should use `--delete`, the three dormant fetchers (`SyncSteamDeckStatus`,
+`SyncProtonRatings`, `SyncSteamCrossRefs`) that nothing calls, and newly
+**`enrichment_queue`, which has no consumer at all** so `/review`'s manual match
+links a game and never enriches it. Nothing may derive work from any of them; they
+need a ruling first.
 
 ## Established baseline
 
@@ -464,21 +472,62 @@ evidence.** No application code changed, so there was nothing to deploy.
 responses carried `server: uvicorn`. Port **8080** on Atlas is another service —
 Nisaba is published on **8090**.
 
+## Match review round, fifth pass (2026-09-17) — the true-up, complete
+
+Bobby ruled the three questions `PRODUCT-7` left open: a **yes** links and
+re-enriches, a **no** tries to match again, and it runs **now** for the verdicts
+already given.
+
+- **`MATCH-004`** — `sync/match_apply.go`. A yes writes through `enrichFromIGDB`,
+extracted from `EnrichLibrary` so a hand-applied match cannot drift from a
+  searched one: IGDB id, artwork, summary, release date, developer, publisher,
+  genres, and `enrichment_status = 'matched'` (which removes the game from the
+  queue). A no records the rejected id in `match_review_rejections`, searches
+  afresh **excluding it**, and returns the row to undecided — and never writes to
+  `games`, verified as **0 of 36** rows changed.
+- **The exclusion is the whole mechanism.** The search is deterministic, so
+  without remembering the rejection a re-match would offer back the exact
+  candidate it was just told to discard. A deliberate manual pick still overrides
+  a rejection.
+- **Re-runnable by design.** Bobby applied the verdicts already stored rather than
+  waiting, so a second press must be harmless: it is, and reports *"No verdicts to
+  apply."*
+- **`DEPLOY-011`** — live, image **`912505fd941d`** (previous `85455eb667b3`).
+  Startup migration created the rejections table. Run result: **50 linked and
+  re-enriched, 31 re-matched, 5 stranded, 0 errors**; games holding an IGDB id
+  **3060 → 3110**; queue **242 → 278 undecided**; 36 rejections recorded; **0**
+  rows whose stored candidate equals a rejected id; `integrity_check ok`.
+- **Status wiring fixed en route.** The Find candidates button from the fourth
+  pass could never have worked: its `hx-target` matched no element, and the shared
+  status partial polled a hardcoded `/sync/status`. Both fixed and the new button
+  built on the corrected pattern. That was my error, not a pre-existing one.
+- **The honest limit of a no.** Because the rejected candidate was the
+  *best*-scoring one, its replacement is by construction lower-ranked and in the
+  sample often worse — *Against the Storm* went from `Metal Storm` to *Life is
+  Strange: Before the Storm*, and *Batman: Arkham Knight* from one skin DLC to
+  another. **A no does not find the right match**; it removes the wrong one and
+  returns the row to the owner, whose inline search box is what actually resolves
+  it. Raised with the data attached, not shipped as a matcher improvement.
+
+**A second finding, unfixed on purpose:** `enrichment_queue` has **no consumer** —
+grepping the table returns only its `INSERT` and a `COUNT`. The older `/review`
+page's manual match therefore sets `igdb_id`, marks the game `manual` (which takes
+it out of the pool `EnrichLibrary` selects from), and enqueues into a queue nothing
+drains. **`/review` links games without enriching them.** Recorded in `OPEN.md`
+rather than fixed, because whether to delete the machinery or build the missing
+consumer is a ruling.
+
 ## Next task
 
-None — `DEPLOY-010` closed the fourth pass on 2026-09-17, and
+None — `DEPLOY-011` closed the fifth pass on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
-**The queue is ready to keep working through at `/match-review`** and is usable on
-every row: 328 games, 185 with a candidate all carrying evidence, 242 still
-undecided, and the 143 that had nothing to compare against can be searched in
-place. Answers save per page and survive sessions. **No verdict is applied to
-`games` yet** — the true-up is a separate pass and still needs its own ruling on
-what a `yes` should do (link only, or link and re-enrich) and what a `no` should
-do to the game. `SetIGDBMatch` + `EnqueueEnrichment` already exist in
-`handlers/enrichment.go` from the older `/review` queue, so a yes is cheap to
-implement once the semantics are ruled; a no has a precedent too (`SkipMatch`
-sets `enrichment_status = 'manual'` to hide a game from the queue).
+**The queue is ready to keep working through at `/match-review`**: 278 games still
+undecided, 185 candidates carrying evidence, and the ones with nothing to compare
+against searchable in place. Answers save per page and survive sessions, and the
+**Apply verdicts** button is now safe to press at any point — it applies whatever
+is outstanding and does nothing when nothing is. The 50 games already accepted are
+linked and fully enriched, so their cover art and metadata come from IGDB now.
 
 **Two older gaps are recorded rather than closed, and neither blocks anything.**
 

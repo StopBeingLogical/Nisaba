@@ -9,6 +9,8 @@
 ---
 
 ## Top-Level Changes (Major only)
+- **Your saved match verdicts now apply to the library.** Games you marked yes are linked to their IGDB entry and fully re-enriched, and games you marked no have the rejected entry remembered so it is never offered again and are searched afresh. On the first run: **50 games linked and re-enriched**, 31 re-matched, 5 with nothing else to offer, 0 errors — games holding an IGDB id went **3060 → 3110**, and every one of the 3388 games has cover art (2026-09-17)
+- Pressing **Find candidates** on the match review page now actually shows its progress — it was pointing at an element that did not exist and would have polled the wrong status endpoint. The Apply button was built on the corrected pattern (2026-09-17)
 - The **Match Review** page became workable: each candidate now carries IGDB's summary, genres, platforms and a link to its IGDB entry, and every row has its own IGDB search box, so a pairing can be judged — or replaced — without leaving the queue. This targeted the 143 of 242 undecided rows that had **no candidate at all** and could not be started. Picking a result saves it and marks the row yes at once; all **99** undecided candidates now hold evidence, and the re-seed moved **0** of the 242 pairings (2026-09-17)
 - A **Match Review** page (`/match-review`) puts each unmatched game beside the best IGDB candidate found for it, with a Yes/No verdict and an explicit Save so the queue can be worked through over several sittings. The search behind it is deliberately looser than enrichment — nothing it finds is applied until you rule on it — and on live it produced candidates for **185 of 328** games with 0 errors (2026-09-17)
 - IGDB's developer and publisher are now stored, and the title matcher tolerates spelling: `publisher` was empty on **all** games because no code path ever wrote it, and the fetch never asked for companies. With `™`/`®`/`©` stripped from the search string, `&` folded to `and`, and roman numerals normalised to arabic, an enrichment pass matched **100 of the 428** never-matched games where the old exact-title test matched 3 — filling 92 publishers and 26 developers, with 0 errors (2026-09-17)
@@ -29,6 +31,7 @@
 - Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
+- `match_review_rejections` remembers IGDB entries ruled out per game, so a re-match returns something different instead of the same wrong candidate. A rejected entry can never be re-offered, while a deliberate manual pick still overrides it (2026-09-17)
 - Candidate evidence was filled for the 86 review rows already ruled on, using the `igdb_id` already stored rather than re-running a search, and updating only the four evidence columns — so no candidate, confidence or verdict could move. All **185** candidates now carry evidence (2026-09-17)
 - `match_review` gains `summary`, `genres`, `platforms` and `igdb_url`, filled when a candidate is found rather than fetched per page view; `SetManualMatch` writes a hand-picked entry unconditionally and sets `decision = 1`, because choosing the match is the verdict (2026-09-17)
 - IGDB fetches now include `platforms.name`, which the review page shows; `CandidateFromGame` is the single place an IGDB entry becomes a review candidate, used by both the finder and the manual pick (2026-09-17)

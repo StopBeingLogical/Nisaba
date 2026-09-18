@@ -152,6 +152,7 @@ func (h *Handler) MatchReviewFind(w http.ResponseWriter, r *http.Request) {
 		h.matchFind.mu.Unlock()
 		h.renderPartial(w, "sync_status_partial.html", syncStatusData{
 			Running: true, Message: "Candidate search already running…",
+			PollURL: "/match-review/status",
 		})
 		return
 	}
@@ -306,6 +307,83 @@ func (h *Handler) MatchReviewStatus(w http.ResponseWriter, r *http.Request) {
 	h.renderPartial(w, "sync_status_partial.html", h.matchFindStatus())
 }
 
+// MatchReviewApply runs the true-up: it turns the saved verdicts into changes to
+// the library. This is the only review endpoint that writes to `games`, and it
+// only runs when asked. Backgrounded because linking and re-enriching costs one
+// IGDB lookup per accepted match.
+func (h *Handler) MatchReviewApply(w http.ResponseWriter, r *http.Request) {
+	h.matchApply.mu.Lock()
+	if h.matchApply.running {
+		h.matchApply.mu.Unlock()
+		h.renderPartial(w, "sync_status_partial.html", syncStatusData{
+			Running: true, Message: "Applying verdicts already running…",
+			PollURL: "/match-review/apply/status",
+		})
+		return
+	}
+	h.matchApply.running = true
+	h.matchApply.done = 0
+	h.matchApply.total = 0
+	h.matchApply.phase = ""
+	h.matchApply.lastMsg = ""
+	h.matchApply.mu.Unlock()
+
+	// The two jobs share one status panel and both read the queue, so let one
+	// finish before the other starts rather than interleaving their progress.
+	h.matchFind.mu.Lock()
+	finderRunning := h.matchFind.running
+	h.matchFind.mu.Unlock()
+	if finderRunning {
+		h.matchApply.mu.Lock()
+		h.matchApply.running = false
+		h.matchApply.mu.Unlock()
+		h.renderPartial(w, "sync_status_partial.html", syncStatusData{
+			Running: false, Message: "A candidate search is running — let it finish first.",
+			PollURL: "/match-review/status",
+		})
+		return
+	}
+
+	client := h.igdbClient()
+	if client == nil {
+		h.matchApply.mu.Lock()
+		h.matchApply.running = false
+		h.matchApply.lastMsg = "IGDB credentials are not configured."
+		h.matchApply.mu.Unlock()
+		h.renderPartial(w, "sync_status_partial.html", h.matchApplyStatus())
+		return
+	}
+
+	go func() {
+		result, err := storesync.ApplyMatchVerdicts(h.store, client, func(p storesync.ApplyProgress) {
+			h.matchApply.mu.Lock()
+			h.matchApply.done = p.Done
+			h.matchApply.total = p.Total
+			h.matchApply.phase = p.Phase
+			h.matchApply.mu.Unlock()
+		})
+
+		h.matchApply.mu.Lock()
+		h.matchApply.running = false
+		h.matchApply.phase = ""
+		if err != nil {
+			h.matchApply.lastMsg = "Apply failed: " + err.Error()
+			log.Printf("match-review: apply verdicts: %v", err)
+		} else {
+			h.matchApply.lastMsg = result.Message
+			log.Printf("match-review: %s", result.Message)
+		}
+		h.matchApply.mu.Unlock()
+	}()
+
+	h.renderPartial(w, "sync_status_partial.html", h.matchApplyStatus())
+}
+
+// MatchReviewApplyStatus is polled while the true-up runs.
+func (h *Handler) MatchReviewApplyStatus(w http.ResponseWriter, r *http.Request) {
+	h.renderPartial(w, "sync_status_partial.html", h.matchApplyStatus())
+}
+
 // matchFindStatus snapshots the candidate-search job in the shape the status
 // partial expects.
 func (h *Handler) matchFindStatus() syncStatusData {
@@ -315,12 +393,37 @@ func (h *Handler) matchFindStatus() syncStatusData {
 	d := syncStatusData{
 		Running:     h.matchFind.running,
 		LastMessage: h.matchFind.lastMsg,
+		PollURL:     "/match-review/status",
 	}
 	if h.matchFind.running {
 		d.Message = "Searching IGDB for the best candidate…"
 		d.Step = "Games searched"
 		d.StepDone = h.matchFind.done
 		d.StepTotal = h.matchFind.total
+		if d.StepTotal > 0 {
+			d.StepPct = d.StepDone * 100 / d.StepTotal
+		}
+	}
+	return d
+}
+
+// matchApplyStatus snapshots the true-up job in the shape the status partial
+// expects. It polls its own endpoint: the two jobs report into the same panel, so
+// a shared URL would make one job's panel show the other's progress.
+func (h *Handler) matchApplyStatus() syncStatusData {
+	h.matchApply.mu.Lock()
+	defer h.matchApply.mu.Unlock()
+
+	d := syncStatusData{
+		Running:     h.matchApply.running,
+		LastMessage: h.matchApply.lastMsg,
+		PollURL:     "/match-review/apply/status",
+	}
+	if h.matchApply.running {
+		d.Message = "Applying your verdicts…"
+		d.Step = h.matchApply.phase
+		d.StepDone = h.matchApply.done
+		d.StepTotal = h.matchApply.total
 		if d.StepTotal > 0 {
 			d.StepPct = d.StepDone * 100 / d.StepTotal
 		}

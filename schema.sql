@@ -321,3 +321,13 @@ CREATE TABLE IF NOT EXISTS match_review (
 );
 
 CREATE INDEX IF NOT EXISTS idx_match_review_decision ON match_review(decision);
+
+-- IGDB ids the owner has explicitly rejected for a game. A rejected entry is
+-- never offered as a candidate again, which is what lets "no, try again" come
+-- back with something new instead of the same wrong answer.
+CREATE TABLE IF NOT EXISTS match_review_rejections (
+    game_id     TEXT    NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    igdb_id     INTEGER NOT NULL,
+    rejected_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (game_id, igdb_id)
+);

@@ -1,7 +1,9 @@
 {{ define "sync_status_partial.html" }}
 <div id="sync-status"
      {{ if .Running }}
-     hx-get="/sync/status"
+     {{/* PollURL lets a page other than the sync dashboard own its own status
+          endpoint; without it every job would poll the sync page's status. */}}
+     hx-get="{{ if .PollURL }}{{ .PollURL }}{{ else }}/sync/status{{ end }}"
      hx-trigger="every 2s"
      hx-swap="outerHTML"
      {{ end }}
