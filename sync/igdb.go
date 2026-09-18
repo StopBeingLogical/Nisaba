@@ -194,11 +194,26 @@ func (g IGDBGame) PlatformNames() []string {
 }
 
 func (c *IGDBClient) query(body string) ([]IGDBGame, error) {
+	b, err := c.post("games", body)
+	if err != nil {
+		return nil, err
+	}
+	var results []IGDBGame
+	if err := json.Unmarshal(b, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// post sends an Apicalypse query to one IGDB endpoint. It is the only place a
+// request leaves this package, so the rate limit is enforced for every endpoint
+// and cannot be bypassed by adding one.
+func (c *IGDBClient) post(endpoint, body string) ([]byte, error) {
 	if err := c.ensureToken(); err != nil {
 		return nil, err
 	}
 	c.throttle()
-	req, _ := http.NewRequest("POST", "https://api.igdb.com/v4/games",
+	req, _ := http.NewRequest("POST", "https://api.igdb.com/v4/"+endpoint,
 		bytes.NewBufferString(body))
 	req.Header.Set("Client-ID", c.clientID)
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
@@ -209,15 +224,14 @@ func (c *IGDBClient) query(body string) ([]IGDBGame, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("IGDB HTTP %d: %s", resp.StatusCode, b)
-	}
-	var results []IGDBGame
-	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
 	}
-	return results, nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("IGDB HTTP %d: %s", resp.StatusCode, b)
+	}
+	return b, nil
 }
 
 const igdbFields = "id,name,cover.url,genres.name,summary,first_release_date,url,platforms.id,platforms.name," +
@@ -398,6 +412,10 @@ func SyncSteamCrossRefs(store *db.Store, igdbClient *IGDBClient, progress func(d
 const (
 	maxRankedResults   = 25
 	maxAnchoredResults = 25
+	// maxAltNameHits bounds the alternative-name hits resolved into games. The
+	// index is loose — one query returned 20 unrelated names — so this is a cap on
+	// work, not an expectation of relevance.
+	maxAltNameHits = 20
 )
 
 // SearchGame returns IGDB rows that may correspond to a store title.
@@ -442,6 +460,17 @@ func (c *IGDBClient) SearchGame(title string) ([]IGDBGame, error) {
 		if i < len(forms)-1 && bestScore(title, merged) >= confidentScore {
 			break
 		}
+	}
+
+	// Last resort: the alternative-names index. Only reached when nothing above
+	// scored confidently, so the two requests are paid by rows that would
+	// otherwise come back empty.
+	if bestScore(title, merged) < confidentScore {
+		alt, err := c.altNameGames(forms[0])
+		if err != nil {
+			return nil, err
+		}
+		merged = appendUnique(merged, seen, alt)
 	}
 	return merged, nil
 }
@@ -550,6 +579,57 @@ func (c *IGDBClient) searchRanked(q string) ([]IGDBGame, error) {
 func rankedBody(q string) string {
 	escaped := strings.ReplaceAll(q, `"`, `\"`)
 	return fmt.Sprintf(`search "%s"; fields %s; limit %d;`, escaped, igdbFields, maxRankedResults)
+}
+
+// altNameBody is the query for IGDB's alternative-names index. That index is a
+// separate endpoint, so the body is built here and resolved to games by
+// altNameGames.
+func altNameBody(q string) string {
+	literal := wildcardLiteral(q)
+	if literal == "" {
+		return ""
+	}
+	return fmt.Sprintf(`where name ~ *"%s"*; fields game,name; limit %d;`, literal, maxAltNameHits)
+}
+
+// altNameGames looks a title up in IGDB's alternative-names index and returns the
+// games behind any hits.
+//
+// This is the last thing tried, because it costs two requests and only pays off
+// where the store's name is not IGDB's. It is worth those requests: measured over
+// the 55 rows that found nothing under the game's own name, it recovered **10**,
+// and three of those exactly — `UBERMOSH:BLACK` is IGDB's `Ubermosh: Black`, and
+// no amount of query cleaning bridges a missing space after a colon when the
+// ranked search will not return the entry either.
+func (c *IGDBClient) altNameGames(q string) ([]IGDBGame, error) {
+	body := altNameBody(q)
+	if body == "" {
+		return nil, nil
+	}
+	b, err := c.post("alternative_names", body)
+	if err != nil {
+		return nil, err
+	}
+	var hits []struct {
+		Game int64 `json:"game"`
+	}
+	if err := json.Unmarshal(b, &hits); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(hits))
+	seen := make(map[int64]bool, len(hits))
+	for _, h := range hits {
+		if h.Game == 0 || seen[h.Game] {
+			continue
+		}
+		seen[h.Game] = true
+		ids = append(ids, strconv.FormatInt(h.Game, 10))
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	return c.query(fmt.Sprintf(`fields %s; where id = (%s); limit %d;`,
+		igdbFields, strings.Join(ids, ","), len(ids)))
 }
 
 // wildcardLiteral strips the characters that would end or unbalance the quoted

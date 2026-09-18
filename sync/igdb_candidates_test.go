@@ -168,6 +168,28 @@ func TestWildcardLiteralStripsDirectives(t *testing.T) {
 	}
 }
 
+// The alternative-names index is a separate endpoint, so the body has to select
+// the game id rather than a name, and a hostile title must not escape the literal.
+func TestAltNameBody(t *testing.T) {
+	body := altNameBody("UBERMOSH:BLACK")
+	if !strings.Contains(body, `where name ~ *"UBERMOSH:BLACK"*`) {
+		t.Errorf("alt-name body does not look the title up by name: %s", body)
+	}
+	if !strings.Contains(body, "fields game,name") {
+		t.Errorf("alt-name body must select the game id to resolve: %s", body)
+	}
+	if !strings.Contains(body, "limit 20") {
+		t.Errorf("alt-name body limit is not maxAltNameHits: %s", body)
+	}
+	if got := altNameBody(""); got != "" {
+		t.Errorf("altNameBody(\"\") = %q, want no query", got)
+	}
+	hostile := altNameBody(`x"* ; drop; "\`)
+	if strings.Count(hostile, `~ *"`) != 1 {
+		t.Errorf("hostile title broke out of the literal: %s", hostile)
+	}
+}
+
 func TestAppendUniqueDropsDuplicates(t *testing.T) {
 	seen := map[int64]bool{}
 	first := []IGDBGame{{ID: 1, Name: "Against the Storm"}}

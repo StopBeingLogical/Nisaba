@@ -136,7 +136,28 @@ box already finds it the moment the title is typed that way. That is not worth 2
 on the front of every search, so it is **not implemented** — recorded here so the
 idea does not have to be re-derived.
 
-### 10. Re-seed the queue
+### 10. Ask IGDB's alternative-names index, but only after everything else has failed
+
+Continuing the same question one more step: of the 55 rows that found nothing under
+the game's own name, what does IGDB know about them at all? Its **alternative-names
+index is a separate endpoint**, and that is where a store title that differs from
+IGDB's canonical name lives.
+
+It is now the last thing tried, and only when nothing else scored confidently, so the
+two requests are paid by rows that would otherwise come back empty. Measured over
+those 55 rows: **10 recovered, three of them exact** — `UBERMOSH:BLACK` is IGDB's
+`Ubermosh: Black`, and no amount of query cleaning bridges a missing space after a
+colon. Also recovered: `Grand Theft Auto V Legacy` → `Grand Theft Auto V` (the branch
+name), `Tomb Raider I-III Remastered Starring Lara Croft`, `Brewmaster`,
+`Minecraft for Windows` → `Minecraft`, `Uplink: Hacker Elite`.
+
+**The cost, recorded:** two of the ten are wrong — `Football Manager 2024 Pre-game
+editor` and `… Resource archiver` both resolve to the game, `Football Manager 2024`,
+at the confident prefix tier. Those are store *tools*, and the alternative-name index
+has no way to know that. The same prefix-tier weakness as §9 and the rest of
+`spec/OPEN.md`.
+
+### 11. Re-seed the queue
 
 The widened search reaches further, so the queue is re-seeded to take the better
 candidates. Rows already ruled on are skipped by design and were verified untouched.
@@ -160,6 +181,13 @@ where the only match the search could offer is one the owner had **already rejec
 holding, not a miss. Of the 30 rows that already had a candidate and carry a bracket,
 **0 scored worse**. Live after the second re-seed: **211 → 221** with a candidate,
 **67 → 57** without, all 8 `Heroes Chronicles` rows filled, decided rows identical.
+
+Then the alternative-names pass, over the 57 still empty: **10 recovered**, 3 exact.
+Live after the third re-seed: **221 → 231** with a candidate, **57 → 47** without.
+
+The floor is now visible and it is close: of the 47 that remain, **45 have nothing
+resembling them anywhere in IGDB, under any name** — store demos, betas, PTR branches,
+tools, launchers, goodie packs, and a media server (`Plex`).
 
 ## The cost, recorded rather than hidden
 

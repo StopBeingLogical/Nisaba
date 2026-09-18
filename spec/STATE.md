@@ -580,8 +580,26 @@ the wrong game while IGDB's own website found it.
   anchor (`MDK 2` → IGDB's `MDK2`) was measured at **1 row of 67** and deliberately
   **not built** — the box finds it when typed, and the form would cost 270ms on every
   search.
-- **`DEPLOY-013`** — live in two passes, images **`0bc200e39e63`** (previous
-  `f20da8a75091`) then **`dd5101c15dbd`**. Dry-run first, since a re-seed re-searches
+- **`MATCH-008`, third pass** — asked what IGDB knows about the rows that match
+  nothing under their own name, and the answer is an **alternative-names index** on
+  its own endpoint. Asking it recovered **10 of the 55** — three **exact**
+  (`UBERMOSH:BLACK` is IGDB's `Ubermosh: Black`) plus `Grand Theft Auto V Legacy`,
+  `Tomb Raider I-III Remastered`, `Brewmaster`, `Minecraft for Windows`, `Uplink`.
+  It is tried only when every name-based form fails, so two requests are paid only by
+  rows that would otherwise come back empty. Two of the ten are wrong — the store's
+  `Football Manager 2024 Pre-game editor` and `Resource archiver` are *tools* that
+  resolve to the game at 0.85 — the prefix tier again.
+- **The scorer question in `OPEN.md` was measured against the owner's own verdicts**
+  rather than argued: the shipped scorer ranks the confirmed entry first in **39/50**,
+  a coverage-based reshuffle in **43/50** — but that reshuffle also swaps in
+  wrong-but-longer names on 16 queue rows (`Temple of Elemental Evil` →
+  `Dungeons & Dragons Online: The Temple of Elemental Evil`; `Deus Ex GOTY` →
+  `Deus Ex: Human Revolution`), and every option leaves the same 12 rejections ranked
+  first. **Recommendation: change nothing.** `0 of 50` confirmed entries are missing
+  from the search results, so the search reaches every answer given and only the
+  ordering is imperfect.
+- **`DEPLOY-013`** — live in three passes, images **`0bc200e39e63`** (previous
+  `f20da8a75091`), **`dd5101c15dbd`**, then **`26889edead64`**. Dry-run first, since a re-seed re-searches
   rows already looked at: 278 rows, 43 gained a candidate, 70 replaced (47 scored
   higher, **0 lower**), 0 lost, 0 errors. Re-seed live in 4m51s: **168 → 211** with a
   candidate, 67 without, shortlists 501 → 753. After the bracket pass, a second
@@ -601,9 +619,13 @@ None — `DEPLOY-013` closed the seventh pass on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
 **The queue is ready to keep working through at `/match-review`**: 278 games still
-undecided, **221 with a candidate** all carrying evidence, and the **57 with nothing
+undecided, **231 with a candidate** all carrying evidence, and the **47 with nothing
 to compare against searchable in place** — and that search box is now the thing this
-round fixed. `Against the Storm`, `Fallout 2`, `Dragonview` and
+round fixed. Of those 47, **45 have nothing resembling them anywhere in IGDB, under
+any name**: demos, betas, PTR branches, store tools, launchers, goodie packs and
+`Plex`. That is a floor rather than a backlog — they are not games, or are branch
+builds IGDB does not model — and the honest options are to hide them from the queue or
+leave them. `Against the Storm`, `Fallout 2`, `Dragonview` and
 `Heroes Chronicles [Chapter 1] - Warlords of the Wasteland` all resolve to the right
 entry. Answers save per page and
 survive sessions, and **Apply verdicts** is safe to press at any point. The 50 games

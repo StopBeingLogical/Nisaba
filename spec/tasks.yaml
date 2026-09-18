@@ -569,7 +569,7 @@ tasks:
     depends_on: [MATCH-007]
     scope: [sync/igdb.go, sync/igdb_candidates_test.go, handlers/match_review.go, spec/evidence/MATCH-008.md]
     outcome: A title search asks IGDB for 25 rows instead of 5 and merges a name-anchored wildcard lookup ahead of the ranked search, because the correct entry for 'Against the Storm' sat at position 10 of the platform-filtered ranking and was truncated away. Retry a subtitle-carrying title on its head, generating two heads - cut at the last separator to keep the game's own name, cut at the first to drop a descriptive tail - narrowest first, because the first version of this fix cut the Dawn of War II title to 'Warhammer 40,000' and matched the wrong game. Drop the platform filter, since bestMatch already prefers PC among exact names and the filter reshaped the ranking. Move the 4-req/sec floor into IGDBClient.query, because one search is now two to six requests and every caller paced itself per game. Stop the fallback loop only on a confident score. Rank the search box's hits by the same scorer the queue uses. Treat a concatenated word as an exact match.
-    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'maxRankedResults' sync/igdb.go", "grep -q 'maxAnchoredResults' sync/igdb.go", "grep -q 'where name ~ ' sync/igdb.go", "grep -q 'headSearchTitle' sync/igdb.go", "grep -q 'stripBracketSegments' sync/igdb.go", "grep -q '147519' spec/evidence/MATCH-008.md", "grep -q '168 -> 211' spec/evidence/DEPLOY-013.md", "grep -q '211 -> 221' spec/evidence/DEPLOY-013.md"]
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'maxRankedResults' sync/igdb.go", "grep -q 'maxAnchoredResults' sync/igdb.go", "grep -q 'where name ~ ' sync/igdb.go", "grep -q 'headSearchTitle' sync/igdb.go", "grep -q 'stripBracketSegments' sync/igdb.go", "grep -q 'altNameGames' sync/igdb.go", "grep -q 'alternative_names' sync/igdb.go", "grep -q '147519' spec/evidence/MATCH-008.md", "grep -q '168 -> 211' spec/evidence/DEPLOY-013.md", "grep -q '211 -> 221' spec/evidence/DEPLOY-013.md", "grep -q '221 -> 231' spec/evidence/DEPLOY-013.md"]
 
   - id: DEPLOY-013
     title: Deploy the search fix and re-seed the queue
@@ -579,7 +579,7 @@ tasks:
     depends_on: [MATCH-008]
     scope: [spec/evidence/DEPLOY-013.md]
     outcome: Check the server tree, deploy, and confirm the routes on 8090. Dry-run the re-seed on a copy first, because it re-searches rows the owner has already looked at, and record how many candidates are gained, replaced and lost. Take a backup, re-seed live, and prove the decided rows are untouched by diffing them before and after. Remove the runner from the container, the host and the tree.
-    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q '0bc200e39e63' spec/evidence/DEPLOY-013.md", "grep -q 'dd5101c15dbd' spec/evidence/DEPLOY-013.md", "grep -q 'DECIDED_ROWS_IDENTICAL' spec/evidence/DEPLOY-013.md"]
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q '0bc200e39e63' spec/evidence/DEPLOY-013.md", "grep -q 'dd5101c15dbd' spec/evidence/DEPLOY-013.md", "grep -q '26889edead64' spec/evidence/DEPLOY-013.md", "grep -q 'DECIDED_ROWS_IDENTICAL' spec/evidence/DEPLOY-013.md"]
 
   - id: DEPLOY-012
     title: Deploy the search fix, shortlists and queue removal, then re-seed

@@ -122,6 +122,30 @@ writes only `match_review`.
 
 Runner removed from the container, the host and the tree; never committed.
 
+## Third pass — the alternative-names index deployed and re-seeded
+
+    $ ssh truenas_admin@192.168.3.174 'sudo docker inspect --format "{{.Image}}" nisaba'   # before
+    sha256:dd5101c15dbdf7193997851e6aa90499f9503c06ea41864207e132424610d97a
+    $ ssh truenas_admin@192.168.3.174 "cd /mnt/MemoryAlpha/nisaba/source && bash deploy.sh"
+    $ ssh truenas_admin@192.168.3.174 'sudo docker inspect --format "{{.Image}}" nisaba'   # after
+    sha256:26889edead643aa233ce43063251d4af319393b01d9846aa8f3d6463e41b2abd
+
+**Rollback target: `dd5101c15dbd`. Deployed: `26889edead64`.**
+
+Backup: `/mnt/MemoryAlpha/nisaba/backups/2026-09-17-2011/nisaba.db`.
+
+    undecided WITH a candidate                    221 -> 231
+    undecided WITHOUT a candidate                  57 ->  47
+    shortlist entries                             796 -> 809
+    exact candidates                               41 ->  45
+    UBERMOSH rows filled                                      3   of 4
+    integrity_check                                         ok
+    DECIDED_ROWS_IDENTICAL
+
+Exactly the 10 rows predicted on the copy. The fourth `UBERMOSH` row,
+`UBERMOSH:OMEGA`, is not in IGDB under that name or any alternative, so it stays
+where it belongs.
+
 ## Corrected mid-flight
 
 The first post-deploy route check reported `404` on `/library` and `/match-review`.

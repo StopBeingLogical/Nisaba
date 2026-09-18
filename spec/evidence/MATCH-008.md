@@ -144,6 +144,82 @@ same 67 rows: **1 recovered**. The search box finds it as soon as the title is t
 `MDK2`, and the form would cost 270ms on the front of every search, so it is not
 implemented. The numbers are here so it does not need re-deriving.
 
+## Third pass — IGDB's alternative-names index
+
+For the 55 rows that found nothing under the game's own name, the question was not
+what query to send but whether IGDB knows the game under *another* name. It does, and
+the index is a separate endpoint:
+
+    POST /v4/alternative_names
+    where name ~ *"UBERMOSH:BLACK"*; fields game,name; limit 20;
+
+Measured over those 55 rows: **10 recovered**, **3 exact**:
+
+```
+  UBERMOSH:BLACK         -> Ubermosh: Black          1.00 exact
+  UBERMOSH:SANTICIDE     -> Ubermosh: Santicide      1.00 exact
+  UBERMOSH:WRAITH        -> Ubermosh: Wraith         1.00 exact
+  Grand Theft Auto V Legacy            -> Grand Theft Auto V          0.85 prefix
+  Football Manager 2024 Pre-game editor -> Football Manager 2024       0.85 prefix  (WRONG)
+  Football Manager 2024 Resource archiver -> Football Manager 2024     0.85 prefix  (WRONG)
+  Tomb Raider I-III Remastered Starring Lara Croft -> Tomb Raider I•II•III Remastered  0.08 weak
+  Brewmaster: Beer Brewing Simulator   -> Brewmaster                   0.05 weak
+  Minecraft for Windows                -> Minecraft                    0.07 weak
+  Uplink: Hacker Elite                 -> Uplink                       0.07 weak
+```
+
+The alternative-names index is loose — one query returned 20 unrelated names — so it
+is resolved to games, capped, and only consulted when every name-based form has
+failed. Cost: two requests, paid only by rows that would otherwise come back empty.
+
+`IGDBClient.post` is now the single place a request leaves the package, so the rate
+limit cannot be bypassed by adding an endpoint.
+
+**The two wrong ones are the prefix tier again.** `Football Manager 2024 Pre-game
+editor` and `… Resource archiver` are store *tools*, and the index cannot know that;
+they resolve to the game at 0.85. Recorded in `spec/OPEN.md` with the rest.
+
+## Can the scorer be improved? Measured against the owner's own verdicts
+
+With 50 confirmed pairs and 36 rejections on file, the open question in `OPEN.md`
+stopped being a matter of taste. Four options were ranked from the **same** search
+results, so the comparison isolates the scorer:
+
+| option | confirmed entry ranked #1 | rejected entry ranked #1 | rejected entry at a confident tier |
+|---|---:|---:|---:|
+| **V0** shipped: tier only | 39/50 | 12/36 | 14/36 |
+| V5 tier, then coverage | 40/50 | 12/36 | 14/36 |
+| V6 coverage first, then tier | 43/50 | 12/36 | 14/36 |
+| V4 exact, then coverage, then tier | 43/50 | 12/36 | 14/36 |
+
+**No confirmed entry is missing from the search results at all (0/50).** The search
+reaches every answer the owner gave; only the ordering is imperfect.
+
+V4 is +4 on the confirmed pairs with **no confirmed entry pushed off #1**. That looks
+decisive until the same ranking is applied to the stored shortlists of the undecided
+queue, where it changes **16 of 221** rows' best candidate — and the changes are mixed:
+
+    WINS    Quake II: The Reckoning        -> Quake II Mission Pack: The Reckoning
+            Quake II: Ground Zero          -> Quake II Mission Pack: Ground Zero
+            The Legend of Kyrandia: Malcolm's Revenge -> The Legend of Kyrandia 3: …
+            Tomb Raider (VI): The Angel of Darkness    -> Tomb Raider: The Angel of Darkness
+    LOSSES  Deus Ex™ GOTY Edition          -> Deus Ex: Human Revolution - A Criminal Past
+            Earth 2150 - Escape from the Blue Planet  -> Earth 2150: The Moon Project
+            Temple of Elemental Evil, The  -> Dungeons & Dragons Online: The Temple of …
+
+Coverage-first has a failure mode of its own: a **long wrong name that contains every
+word of the stored title** outscores the short right one. `Temple of Elemental Evil,
+The` is the clearest case — the correct entry and the wrong one both cover 5 of 5
+tokens, and the tie goes to the wrong one.
+
+**Conclusion: do not change the scorer on this evidence.** V5 is +1 of 50, which is
+noise; V4/V6 are +4 on the pairs but demonstrably trade them for new wrong picks on
+the queue the owner actually reads. The tiers themselves, not the tie-break, are what
+misfire — all four options leave the same 12 rejections ranked first and 14 at a
+confident tier. The route worth trying next is not a reshuffle of the four tiers but a
+mechanism that can tell *Temple of Elemental Evil* from *Dungeons & Dragons Online:
+The Temple of Elemental Evil*, and coverage alone cannot.
+
 ## Not fixed here, and why
 
 `search` returning summary noise for common words is inherent to the endpoint, not a

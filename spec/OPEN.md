@@ -61,14 +61,40 @@ deleted.
   lower — which suggests the real question is whether the tiers should be ordered by
   **coverage of the stored title** (how much of it a candidate accounts for) rather
   than by match shape: `Tomb Raider` covers 2 of its 8 tokens, the correct entry 5.
-  Options I can see, not a recommendation: (a) require the extension to be two words
-  or more and not a single acronym token; (b) break score ties by specificity so the
-  **longest** matching IGDB name wins — `Star Wars: TIE Fighter` over `Star Wars`,
-  which would also fix the Dawn of War case but not this one; (c) rank by coverage of
-  the stored title; (d) leave it, since a rejection is remembered and the row shows
-  its evidence. Each is cheap to measure against the stored shortlists — and, for the
-  two thirds of rows already carrying a verdict, against the owner's **own answers**
-  — before it is ruled on. Not derived into a task.
+  **Measured 2026-09-17, against the owner's own verdicts** (50 confirmed, 36
+  rejected), all four options ranked from the same results:
+
+  | option | confirmed entry #1 | rejected entry #1 | rejected at a confident tier |
+  |---|---:|---:|---:|
+  | shipped: tier only | 39/50 | 12/36 | 14/36 |
+  | tier, then coverage | 40/50 | 12/36 | 14/36 |
+  | coverage first, then tier | 43/50 | 12/36 | 14/36 |
+  | exact, then coverage, then tier | 43/50 | 12/36 | 14/36 |
+
+  Coverage-first looks like a **+4 improvement with no confirmed entry pushed off**
+  #1 — until the same ranking is applied to the stored shortlists, where it changes
+  **16 of 221** queue rows and the changes split. Wins: `Quake II: The Reckoning` →
+  `Quake II Mission Pack: The Reckoning`, `The Legend of Kyrandia: Malcolm's Revenge`
+  → `The Legend of Kyrandia 3: …`, `Tomb Raider (VI): The Angel of Darkness` →
+  `Tomb Raider: The Angel of Darkness`. Losses: `Deus Ex™ GOTY Edition` →
+  `Deus Ex: Human Revolution`, `Earth 2150 - Escape from the Blue Planet` →
+  `Earth 2150: The Moon Project`, and `Temple of Elemental Evil, The` →
+  `Dungeons & Dragons Online: The Temple of Elemental Evil`. That last one names
+  coverage's own failure mode: a **long wrong name containing every word of the
+  stored title** beats the short right one.
+
+  **And `0 of 50` confirmed entries are missing from the search results at all** — the
+  search reaches every answer the owner has given, so what remains is ordering, not
+  reach. Since all four options leave the *same* 12 rejections ranked first and the
+  same 14 at a confident tier, the tiers themselves misfire rather than their
+  tie-break, and a reshuffle is not the answer. **Current recommendation: change
+  nothing.** Options still open, none recommended: (a) require the extension to be two
+  words or more and not a single acronym token; (b) break ties by specificity —
+  `Star Wars: TIE Fighter` over `Star Wars`, which would fix the Dawn of War case but
+  not Tomb Raider; (c) a mechanism that can tell `Temple of Elemental Evil` from
+  `Dungeons & Dragons Online: The Temple of Elemental Evil`, which coverage cannot;
+  (d) leave it, since a rejection is remembered and the row shows its evidence. Not
+  derived into a task.
 
 ## Model inferences, unratified
 
