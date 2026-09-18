@@ -105,6 +105,8 @@ func New(store *db.Store, tmplFS fs.FS, funcMap template.FuncMap, dataDir string
 			"mystery_pack_analysis_partial.html",
 			"mystery_pack_game_add_partial.html",
 			"mystery_pack_games_section_partial.html",
+			"match_row_partial.html",
+			"match_search_results_partial.html",
 		),
 	)
 
@@ -153,6 +155,7 @@ var partials = []string{
 	"mystery_pack_analysis_partial.html",
 	"mystery_pack_game_add_partial.html",
 	"mystery_pack_games_section_partial.html",
+	"match_row_partial.html",
 }
 
 // cleanupWishlistLinks runs the full wishlist cleanup pipeline after a sync:

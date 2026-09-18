@@ -1,0 +1,109 @@
+{{ define "match_row_partial.html" }}
+{{/* One game/candidate pairing. Rendered inside the page's save form, and
+     re-rendered standalone by an HTMX swap after a manual IGDB pick. */}}
+<div class="sync-card flex items-start gap-4" id="match-row-{{ .ID }}">
+    <input type="hidden" name="game_ids" value="{{ .ID }}">
+
+    <!-- Left: the listing as it stands -->
+    <div class="flex items-start gap-3 w-[34%] min-w-0 pt-0.5">
+        <div class="shrink-0 w-14 rounded-lg overflow-hidden bg-gray-800">
+            {{ if .Artwork.Square.URL }}
+            <img src="{{ .Artwork.Square.URL | proxyURL }}" alt="{{ .Title }}" class="w-full aspect-[2/3] object-cover" />
+            {{ else }}
+            <div class="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-gray-500 text-[10px] text-center p-1">no art</div>
+            {{ end }}
+        </div>
+        <div class="min-w-0">
+            <div class="text-sm font-medium truncate" title="{{ .Title }}">{{ .Title }}</div>
+            <div class="flex gap-0.5 mt-1">
+                {{ range storeList .StoreInfo }}<span class="store-badge store-{{ . }}"></span>{{ end }}
+            </div>
+            <div class="text-[11px] text-gray-600 mt-1">no IGDB match</div>
+        </div>
+    </div>
+
+    <!-- Middle: candidate and the evidence for judging it -->
+    <div class="flex items-start gap-3 flex-1 min-w-0">
+        <div class="text-gray-600 shrink-0 pt-4">→</div>
+        <div class="shrink-0 w-14 rounded-lg overflow-hidden bg-gray-800">
+            {{ if .CoverURL }}
+            <img src="{{ .CoverURL | proxyURL }}" alt="{{ .IGDBName }}" class="w-full aspect-[2/3] object-cover" />
+            {{ else }}
+            <div class="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-gray-500 text-[10px] text-center p-1">—</div>
+            {{ end }}
+        </div>
+        <div class="min-w-0 flex-1">
+            {{ if .HasCandidate }}
+            <div class="text-sm font-medium truncate" title="{{ .IGDBName }}">{{ .IGDBName }}</div>
+            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                {{ if .ReleaseYear }}<span class="text-[11px] text-gray-500">{{ .ReleaseYear }}</span>{{ end }}
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full
+                    {{ if eq .Confidence "exact" }}bg-green-900 text-green-300
+                    {{ else if eq .Confidence "manual" }}bg-emerald-800 text-emerald-200
+                    {{ else if eq .Confidence "prefix" }}bg-amber-900 text-amber-300
+                    {{ else if eq .Confidence "contains" }}bg-blue-900 text-blue-300
+                    {{ else }}bg-gray-800 text-gray-400{{ end }}">
+                    {{ confidenceLabel .Confidence }}
+                </span>
+                {{ if .InLibrary }}
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-950 text-red-300" title="This IGDB entry is already matched to another game in the library">
+                    already in library
+                </span>
+                {{ end }}
+                {{ if .IGDBURL }}
+                <a href="{{ .IGDBURL }}" target="_blank" rel="noopener"
+                   class="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                   title="Open this entry on IGDB">IGDB #{{ .IGDBID }} ↗</a>
+                {{ else }}
+                <span class="text-[11px] text-gray-600">IGDB #{{ .IGDBID }}</span>
+                {{ end }}
+            </div>
+
+            {{ if .SummaryText }}<p class="text-[11px] text-gray-400 mt-1.5 leading-snug">{{ .SummaryText }}</p>{{ end }}
+
+            {{ if or .Genres .Platforms }}
+            <div class="text-[10px] text-gray-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                {{ if .Genres }}<span><span class="text-gray-600">genres:</span> {{ .Genres }}</span>{{ end }}
+                {{ if .Platforms }}<span><span class="text-gray-600">platforms:</span> {{ range $i, $p := .PlatformShown }}{{ if $i }}, {{ end }}{{ $p }}{{ end }}{{ if gt .PlatformExtra 0 }} +{{ .PlatformExtra }} more{{ end }}</span>{{ end }}
+            </div>
+            {{ end }}
+            {{ else }}
+            <div class="text-sm text-gray-500">No candidate found</div>
+            <div class="text-[11px] text-gray-600 mt-1">IGDB returned nothing usable for this title — search for it below.</div>
+            {{ end }}
+
+            <!-- Manual search. Open by default when there is nothing to compare. -->
+            <details class="mt-2" {{ if not .HasCandidate }}open{{ end }}>
+                <summary class="text-[11px] text-amber-400 hover:text-amber-300 cursor-pointer select-none">
+                    {{ if .HasCandidate }}Wrong game? Search IGDB{{ else }}Search IGDB by hand{{ end }}
+                </summary>
+                <div class="mt-2">
+                    <input type="text" name="q" placeholder="Type a title, then pick the right entry…" autocomplete="off"
+                           hx-get="/match-review/{{ .ID }}/search"
+                           hx-trigger="keyup changed delay:400ms"
+                           hx-target="#match-search-{{ .ID }}"
+                           hx-swap="innerHTML"
+                           hx-include="this"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();}"
+                           class="w-full px-2 py-1 bg-gray-950 border border-gray-700 rounded text-xs text-gray-200 focus:outline-none focus:border-amber-500" />
+                    <div id="match-search-{{ .ID }}" class="mt-1"></div>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- Right: verdict -->
+    <div class="shrink-0 flex items-center gap-3 pl-2 pt-2">
+        <label class="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+            <input type="radio" name="decision_{{ .ID }}" value="yes" {{ if .AcceptedYes }}checked{{ end }}
+                   class="accent-green-500 w-4 h-4" />
+            <span class="text-green-400">Yes</span>
+        </label>
+        <label class="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+            <input type="radio" name="decision_{{ .ID }}" value="no" {{ if .AcceptedNo }}checked{{ end }}
+                   class="accent-red-500 w-4 h-4" />
+            <span class="text-red-400">No</span>
+        </label>
+    </div>
+</div>
+{{ end }}

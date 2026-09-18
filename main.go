@@ -162,6 +162,8 @@ func main() {
 		r.Post("/match-review/save", h.MatchReviewSave)
 		r.Post("/match-review/find", h.MatchReviewFind)
 		r.Get("/match-review/status", h.MatchReviewStatus)
+		r.Get("/match-review/{id}/search", h.MatchReviewSearch)
+		r.Post("/match-review/{id}/candidate", h.MatchReviewSetCandidate)
 
 		// GOG token import
 		r.Post("/auth/gog/exchange", h.GOGAuthExchange)
@@ -227,6 +229,11 @@ func runMigrations(sqlDB *sql.DB) error {
 		`ALTER TABLE wishlist_entries ADD COLUMN best_price_url TEXT`,
 		`ALTER TABLE wishlist_entries ADD COLUMN gg_deals_price REAL`,
 		`ALTER TABLE wishlist_entries ADD COLUMN gg_deals_url TEXT`,
+		// Evidence columns on the match-review queue (see schema.sql).
+		`ALTER TABLE match_review ADD COLUMN summary TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE match_review ADD COLUMN genres TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE match_review ADD COLUMN platforms TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE match_review ADD COLUMN igdb_url TEXT NOT NULL DEFAULT ''`,
 		`CREATE TABLE IF NOT EXISTS mystery_pack_sites (
 			id       TEXT PRIMARY KEY,
 			name     TEXT NOT NULL,

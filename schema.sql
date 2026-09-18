@@ -305,9 +305,16 @@ CREATE TABLE IF NOT EXISTS match_review (
     igdb_name    TEXT    NOT NULL DEFAULT '',
     cover_url    TEXT    NOT NULL DEFAULT '',
     release_year TEXT    NOT NULL DEFAULT '',
-    confidence   TEXT    NOT NULL DEFAULT '',   -- exact | prefix | contains | tokens | weak | none
+    confidence   TEXT    NOT NULL DEFAULT '',   -- exact | prefix | contains | tokens | weak | none | manual
     score        REAL    NOT NULL DEFAULT 0,
     in_library   INTEGER NOT NULL DEFAULT 0,    -- candidate igdb_id already matched to another game
+    -- Evidence shown next to the candidate so a pairing can be judged without
+    -- leaving the page: IGDB summary, comma-joined genres and platform names,
+    -- and the IGDB page URL. Empty until a candidate is found.
+    summary      TEXT    NOT NULL DEFAULT '',
+    genres       TEXT    NOT NULL DEFAULT '',
+    platforms    TEXT    NOT NULL DEFAULT '',
+    igdb_url     TEXT    NOT NULL DEFAULT '',
     searched_at  TEXT,
     decision     INTEGER,                       -- NULL undecided, 1 correct, 0 wrong
     decided_at   TEXT

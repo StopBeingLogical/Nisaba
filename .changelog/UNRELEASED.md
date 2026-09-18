@@ -9,6 +9,7 @@
 ---
 
 ## Top-Level Changes (Major only)
+- The **Match Review** page became workable: each candidate now carries IGDB's summary, genres, platforms and a link to its IGDB entry, and every row has its own IGDB search box, so a pairing can be judged — or replaced — without leaving the queue. This targeted the 143 of 242 undecided rows that had **no candidate at all** and could not be started. Picking a result saves it and marks the row yes at once; all **99** undecided candidates now hold evidence, and the re-seed moved **0** of the 242 pairings (2026-09-17)
 - A **Match Review** page (`/match-review`) puts each unmatched game beside the best IGDB candidate found for it, with a Yes/No verdict and an explicit Save so the queue can be worked through over several sittings. The search behind it is deliberately looser than enrichment — nothing it finds is applied until you rule on it — and on live it produced candidates for **185 of 328** games with 0 errors (2026-09-17)
 - IGDB's developer and publisher are now stored, and the title matcher tolerates spelling: `publisher` was empty on **all** games because no code path ever wrote it, and the fetch never asked for companies. With `™`/`®`/`©` stripped from the search string, `&` folded to `and`, and roman numerals normalised to arabic, an enrichment pass matched **100 of the 428** never-matched games where the old exact-title test matched 3 — filling 92 publishers and 26 developers, with 0 errors (2026-09-17)
 - The last 2 mergeable duplicate pairs are gone: `DATA-002`'s conflict guard counted `owned = 0` reference links that no query reads, so Wasteland 2: Director's Cut and Heretic were left duplicated after their blockers were deleted. 3388 games now, 5 duplicate groups remaining — each holding two genuine owned store ids for one store (2026-09-17)
@@ -28,6 +29,8 @@
 - Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
+- `match_review` gains `summary`, `genres`, `platforms` and `igdb_url`, filled when a candidate is found rather than fetched per page view; `SetManualMatch` writes a hand-picked entry unconditionally and sets `decision = 1`, because choosing the match is the verdict (2026-09-17)
+- IGDB fetches now include `platforms.name`, which the review page shows; `CandidateFromGame` is the single place an IGDB entry becomes a review candidate, used by both the finder and the manual pick (2026-09-17)
 - Added the `match_review` table: one row per unmatched game holding the best IGDB candidate and a **three-valued** verdict (`NULL` undecided / 1 correct / 0 wrong), so a review can be paused and resumed. Store methods list, count, save decisions, upsert a candidate, and return the set of already-matched IGDB ids (2026-09-17)
 - `EnrichGame` now writes `developer` and `publisher`, both through `COALESCE` so an IGDB match fills a gap without overwriting a value a sync or a hand entry already supplied; `EnrichGameParams` carries both (2026-09-17)
 - `multi_store_owned` now counts the game's own owned store links instead of looking for another game row sharing its `igdb_id`. The old test reported 796 games as owned on multiple stores where 102 are — 786 false positives and 92 false negatives (2026-09-17)

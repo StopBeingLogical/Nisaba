@@ -38,6 +38,14 @@ found for it, with a Yes/No verdict that saves per page and survives sessions.
 `DEPLOY-009` shipped it and seeded the queue — **185 of 328** games have a
 candidate. Nothing is applied to `games` yet. See below.
 
+A **fourth pass opened and closed the same day** (`PRODUCT-8.md`), after Bobby
+reported the queue needed inspecting one row at a time. The measurement found why:
+**143 of the 242 undecided rows had no candidate**, so there was nothing to judge.
+`MATCH-002` and `DEPLOY-010` fixed that — every candidate now carries IGDB's
+summary, genres, platforms and a link, and every row has its own IGDB search box.
+All 99 undecided candidates hold evidence and the re-seed moved **0** pairings.
+See below.
+
 `OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
 rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
 should use `--delete`, and the three dormant fetchers (`SyncSteamDeckStatus`,
@@ -404,16 +412,61 @@ with no non-interactive trigger. The same shape of limit as `DEPLOY-006` and
 `DEPLOY-008`. Pressing **Find candidates** once closes it, and it is safe to press
 at any time.
 
+## Match review round, fourth pass (2026-09-17) — complete
+
+Bobby: *"I went through several pages. A lot of these I would need to inspect one
+by one, it may take awhile."* That is a report of friction, and the measurement
+behind it was decisive: **143 of the 242 undecided rows had no candidate at all**,
+so the right column said `No candidate found` and ruling on them meant leaving the
+page. None of those 143 had been started. Of the rest, `tokens` was running 18 yes
+to 1 no (nearly all safe) while `weak` was a coin flip at 15/21.
+
+Bobby chose **inline IGDB search** and **more candidate evidence**, and declined
+keyboard shortcuts and a bulk-accept, so neither was built.
+
+- **`MATCH-002`** — `match_review` gains `summary`, `genres`, `platforms` and
+  `igdb_url`, filled when a candidate is found. Fetched at render time, 25 rows a
+  page would have meant 25 IGDB calls per page view; stored once, the page stays a
+  single database read. Display is bounded to keep a row readable — summary cut at
+  **280 characters** on a word boundary, **4** platform names plus a `+N more`.
+- **Every row has an IGDB search box** — open by default where there is nothing to
+  compare, collapsed behind *"Wrong game? Search IGDB"* where a candidate exists.
+  Finding a game by hand is now a single interaction, which is what the 143 rows
+  needed. This is the one place a loosened matcher is not required: the owner does
+  the matching.
+- **Picking a result is the verdict, and saves at once.** It stores the candidate
+  and marks the row yes, labelled `you picked this` — the click is already an
+  unambiguous instruction, and a row resolved that way should not depend on the
+  page being saved first. **Save** still governs only the yes/no radios, so the two
+  paths cannot fight. This deliberately overrides `MATCH-001`'s
+  never-overwrite-a-decided-row rule, using an unconditional write.
+- **`DEPLOY-010`** — live, image **`85455eb667b3`** (previous `afc4167e49b2`). The
+  startup migration added the four columns; **37 server `.go` files, 37 local,
+  none only-on-server** before syncing. Re-seeded: 242 searched, 99 with a
+  candidate, 0 errors.
+- **The re-seed moved nothing.** All **242 undecided pairings are byte-identical**
+  before and after, and the verdict counts are unchanged at 50 yes / 36 no / 242
+  undecided. Adding `platforms.name` to the fetched fields does not reach the
+  scoring function, so re-running the search cannot shift a candidate under an unruled row.
+- Live now: **99 of 99** undecided candidates carry an IGDB URL, 92 a summary, 94
+  genres, 95 platforms. The 86 already-decided rows keep no evidence by design.
+
+**A false alarm worth remembering.** The first post-deploy route check returned
+`404` for `/library` and `/match-review`, which looked like a regression; the
+responses carried `server: uvicorn`. Port **8080** on Atlas is another service —
+Nisaba is published on **8090**.
+
 ## Next task
 
-None — `DEPLOY-009` closed the match review round on 2026-09-17, and
+None — `DEPLOY-010` closed the fourth pass on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
-**The queue is ready to work through at `/match-review`**: 328 games, 185 with a
-candidate, all undecided. Answers save per page and survive sessions. **No verdict
-is applied to `games` yet** — the true-up is a separate pass and needs its own
-ruling on what a `yes` should do (link only, or link and re-enrich) and what a
-`no` should do to the game.
+**The queue is ready to keep working through at `/match-review`** and is now
+usable on every row: 328 games, 185 with a candidate, 242 still undecided, and the
+143 that had nothing to compare against can be searched in place. Answers save per
+page and survive sessions. **No verdict is applied to `games` yet** — the true-up
+is a separate pass and still needs its own ruling on what a `yes` should do (link
+only, or link and re-enrich) and what a `no` should do to the game.
 
 **Two older gaps are recorded rather than closed, and neither blocks anything.**
 

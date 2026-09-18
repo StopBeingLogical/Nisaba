@@ -1,0 +1,30 @@
+{{ define "match_search_results_partial.html" }}
+{{/* IGDB search hits for one row. These controls live inside the page's save
+     form, so every button is explicitly type="button" — a default submit button
+     here would post the whole page's verdicts instead of picking a match. */}}
+{{ range . }}
+<div class="flex items-center gap-2 p-1.5 bg-gray-800 rounded-lg">
+    {{ if .CoverURL }}
+    <img src="{{ .CoverURL | proxyURL }}" alt="{{ .Name }}" class="w-8 h-8 rounded object-cover shrink-0" />
+    {{ else }}
+    <div class="w-8 h-8 rounded bg-gray-700 shrink-0"></div>
+    {{ end }}
+
+    <div class="flex-1 min-w-0">
+        <div class="text-xs font-medium text-gray-200 truncate" title="{{ .Name }}">{{ .Name }}</div>
+        <div class="text-[10px] text-gray-500">{{ .ReleaseYear }}{{ if not .ReleaseYear }}unknown year{{ end }}</div>
+    </div>
+
+    <button type="button"
+            hx-post="/match-review/{{ .GameID }}/candidate"
+            hx-vals='{"igdb_id": "{{ .IGDBID }}"}'
+            hx-target="#match-row-{{ .GameID }}"
+            hx-swap="outerHTML"
+            class="shrink-0 px-2 py-1 bg-amber-500 hover:bg-amber-400 text-gray-950 text-[11px] font-semibold rounded transition">
+        Use this
+    </button>
+</div>
+{{ else }}
+<div class="text-[11px] text-gray-500 py-1">No IGDB results for that title.</div>
+{{ end }}
+{{ end }}

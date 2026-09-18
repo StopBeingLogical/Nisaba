@@ -1800,19 +1800,31 @@ func (s *Store) SetEnrichmentStatus(id, status string) error {
 // A row always exists for a game on the page; the candidate fields are empty
 // when the search found nothing, which the template renders as "no candidate".
 type MatchReviewRow struct {
-	ID         string
-	Title      string
-	ArtworkRaw sql.NullString
-	StoreInfo  string
-	IGDBID     int64
-	IGDBName   string
-	CoverURL   string
+	ID          string
+	Title       string
+	ArtworkRaw  sql.NullString
+	StoreInfo   string
+	IGDBID      int64
+	IGDBName    string
+	CoverURL    string
 	ReleaseYear string
-	Confidence string
-	InLibrary  bool
+	Confidence  string
+	InLibrary   bool
+	// Evidence for judging the candidate without leaving the page.
+	Summary   string
+	Genres    string
+	Platforms string
+	IGDBURL   string
 	// Decision is NULL when the game has not been ruled on yet.
 	Decision sql.NullInt64
 }
+
+// maxSummaryChars / maxPlatforms bound what one row renders, so a long IGDB
+// summary or a 20-platform release does not stretch the queue into a wall of text.
+const (
+	maxSummaryChars = 280
+	maxPlatforms    = 4
+)
 
 // Artwork parses the game's stored artwork JSON for the listing column.
 func (r MatchReviewRow) Artwork() Artwork { return ParseArtwork(r.ArtworkRaw) }
@@ -1823,6 +1835,54 @@ func (r MatchReviewRow) HasCandidate() bool { return r.IGDBID != 0 && r.IGDBName
 // AcceptedYes / AcceptedNo drive the radio state in the template.
 func (r MatchReviewRow) AcceptedYes() bool { return r.Decision.Valid && r.Decision.Int64 == 1 }
 func (r MatchReviewRow) AcceptedNo() bool  { return r.Decision.Valid && r.Decision.Int64 == 0 }
+
+// SummaryText is the IGDB summary cut to maxSummaryChars on a word boundary.
+func (r MatchReviewRow) SummaryText() string {
+	s := strings.TrimSpace(r.Summary)
+	if len(s) <= maxSummaryChars {
+		return s
+	}
+	cut := s[:maxSummaryChars]
+	if i := strings.LastIndex(cut, " "); i > 0 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " ,.;:-") + "…"
+}
+
+// splitList turns a comma-joined evidence column back into items.
+func splitList(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ", ")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// GenreList / PlatformList expose the comma-joined columns as slices.
+func (r MatchReviewRow) GenreList() []string    { return splitList(r.Genres) }
+func (r MatchReviewRow) PlatformList() []string { return splitList(r.Platforms) }
+
+// PlatformShown is the first maxPlatforms platforms; PlatformExtra is the rest.
+func (r MatchReviewRow) PlatformShown() []string {
+	p := r.PlatformList()
+	if len(p) > maxPlatforms {
+		return p[:maxPlatforms]
+	}
+	return p
+}
+
+func (r MatchReviewRow) PlatformExtra() int {
+	if n := len(r.PlatformList()) - maxPlatforms; n > 0 {
+		return n
+	}
+	return 0
+}
 
 // MatchReviewCounts is the per-filter tally shown on the review page.
 type MatchReviewCounts struct {
@@ -1882,6 +1942,7 @@ SELECT
               FROM game_stores WHERE game_id = g.id AND owned = 1), '') AS store_info,
     COALESCE(m.igdb_id, 0), COALESCE(m.igdb_name, ''), COALESCE(m.cover_url, ''),
     COALESCE(m.release_year, ''), COALESCE(m.confidence, ''), COALESCE(m.in_library, 0),
+    COALESCE(m.summary, ''), COALESCE(m.genres, ''), COALESCE(m.platforms, ''), COALESCE(m.igdb_url, ''),
     m.decision
 FROM games g
 LEFT JOIN match_review m ON m.game_id = g.id
@@ -1899,7 +1960,8 @@ LIMIT ? OFFSET ?`, filter.predicate()), limit, offset)
 		var r MatchReviewRow
 		if err := rows.Scan(&r.ID, &r.Title, &r.ArtworkRaw, &r.StoreInfo,
 			&r.IGDBID, &r.IGDBName, &r.CoverURL, &r.ReleaseYear, &r.Confidence,
-			&r.InLibrary, &r.Decision); err != nil {
+			&r.InLibrary, &r.Summary, &r.Genres, &r.Platforms, &r.IGDBURL,
+			&r.Decision); err != nil {
 			return nil, err
 		}
 		result = append(result, r)
@@ -1985,14 +2047,18 @@ type MatchCandidate struct {
 	Confidence  string
 	Score       float64
 	InLibrary   bool
+	Summary     string
+	Genres      string
+	Platforms   string
+	IGDBURL     string
 }
 
 // UpsertMatchCandidate stores a candidate, leaving any already-decided row
 // untouched so a re-run cannot disturb work the owner has done.
 func (s *Store) UpsertMatchCandidate(c MatchCandidate) error {
 	_, err := s.db.Exec(`
-INSERT INTO match_review (game_id, igdb_id, igdb_name, cover_url, release_year, confidence, score, in_library, searched_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+INSERT INTO match_review (game_id, igdb_id, igdb_name, cover_url, release_year, confidence, score, in_library, summary, genres, platforms, igdb_url, searched_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 ON CONFLICT(game_id) DO UPDATE SET
     igdb_id      = excluded.igdb_id,
     igdb_name    = excluded.igdb_name,
@@ -2001,10 +2067,64 @@ ON CONFLICT(game_id) DO UPDATE SET
     confidence   = excluded.confidence,
     score        = excluded.score,
     in_library   = excluded.in_library,
+    summary      = excluded.summary,
+    genres       = excluded.genres,
+    platforms    = excluded.platforms,
+    igdb_url     = excluded.igdb_url,
     searched_at  = CURRENT_TIMESTAMP
 WHERE match_review.decision IS NULL`,
-		c.GameID, c.IGDBID, c.IGDBName, c.CoverURL, c.ReleaseYear, c.Confidence, c.Score, c.InLibrary)
+		c.GameID, c.IGDBID, c.IGDBName, c.CoverURL, c.ReleaseYear, c.Confidence, c.Score, c.InLibrary,
+		c.Summary, c.Genres, c.Platforms, c.IGDBURL)
 	return err
+}
+
+// SetManualMatch stores an IGDB entry the owner picked by hand on the review
+// page and records it as a yes in one step: choosing the match *is* the verdict.
+// Unlike UpsertMatchCandidate this deliberately overwrites a decided row, since
+// the click is an explicit instruction that outranks whatever was there before.
+func (s *Store) SetManualMatch(c MatchCandidate) error {
+	_, err := s.db.Exec(`
+INSERT INTO match_review (game_id, igdb_id, igdb_name, cover_url, release_year, confidence, score, in_library, summary, genres, platforms, igdb_url, searched_at, decision, decided_at)
+VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP)
+ON CONFLICT(game_id) DO UPDATE SET
+    igdb_id      = excluded.igdb_id,
+    igdb_name    = excluded.igdb_name,
+    cover_url    = excluded.cover_url,
+    release_year = excluded.release_year,
+    confidence   = excluded.confidence,
+    in_library   = excluded.in_library,
+    summary      = excluded.summary,
+    genres       = excluded.genres,
+    platforms    = excluded.platforms,
+    igdb_url     = excluded.igdb_url,
+    searched_at  = CURRENT_TIMESTAMP,
+    decision     = 1,
+    decided_at   = CURRENT_TIMESTAMP`,
+		c.GameID, c.IGDBID, c.IGDBName, c.CoverURL, c.ReleaseYear, c.Confidence, c.InLibrary,
+		c.Summary, c.Genres, c.Platforms, c.IGDBURL)
+	return err
+}
+
+// GetMatchReviewRow loads a single queue row, so an HTMX swap can re-render just
+// the row that changed instead of the whole page.
+func (s *Store) GetMatchReviewRow(gameID string) (MatchReviewRow, error) {
+	var r MatchReviewRow
+	err := s.db.QueryRow(`
+SELECT
+    g.id, g.title, g.artwork,
+    COALESCE((SELECT GROUP_CONCAT(store || ':' || COALESCE(store_id, ''))
+              FROM game_stores WHERE game_id = g.id AND owned = 1), '') AS store_info,
+    COALESCE(m.igdb_id, 0), COALESCE(m.igdb_name, ''), COALESCE(m.cover_url, ''),
+    COALESCE(m.release_year, ''), COALESCE(m.confidence, ''), COALESCE(m.in_library, 0),
+    COALESCE(m.summary, ''), COALESCE(m.genres, ''), COALESCE(m.platforms, ''), COALESCE(m.igdb_url, ''),
+    m.decision
+FROM games g
+LEFT JOIN match_review m ON m.game_id = g.id
+WHERE g.id = ?`, gameID).Scan(&r.ID, &r.Title, &r.ArtworkRaw, &r.StoreInfo,
+		&r.IGDBID, &r.IGDBName, &r.CoverURL, &r.ReleaseYear, &r.Confidence,
+		&r.InLibrary, &r.Summary, &r.Genres, &r.Platforms, &r.IGDBURL,
+		&r.Decision)
+	return r, err
 }
 
 // MatchedIGDBIDs returns the igdb_ids already matched to a game, so the review

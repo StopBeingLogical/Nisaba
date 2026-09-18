@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
 	"nisaba/db"
 	storesync "nisaba/sync"
 )
@@ -199,6 +201,106 @@ func (h *Handler) MatchReviewFind(w http.ResponseWriter, r *http.Request) {
 	h.renderPartial(w, "sync_status_partial.html", h.matchFindStatus())
 }
 
+// matchSearchResult is one IGDB hit offered when the owner searches a title by
+// hand. The pick carries only the id — the handler re-fetches the entry so the
+// stored candidate has the same evidence as a searched one.
+type matchSearchResult struct {
+	GameID      string
+	IGDBID      int64
+	Name        string
+	CoverURL    string
+	ReleaseYear string
+}
+
+// MatchReviewSearch proxies an IGDB title search from a row on the review page,
+// so a wrong or missing candidate can be replaced without leaving the queue.
+func (h *Handler) MatchReviewSearch(w http.ResponseWriter, r *http.Request) {
+	gameID := chi.URLParam(r, "id")
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		h.renderPartial(w, "match_search_results_partial.html", nil)
+		return
+	}
+
+	client := h.igdbClient()
+	if client == nil {
+		http.Error(w, "IGDB credentials are not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	games, err := client.SearchGamePC(q)
+	if err != nil {
+		log.Printf("MatchReviewSearch %s: %v", q, err)
+		http.Error(w, "IGDB search failed", http.StatusBadGateway)
+		return
+	}
+
+	results := make([]matchSearchResult, 0, len(games))
+	for _, g := range games {
+		results = append(results, matchSearchResult{
+			GameID:      gameID,
+			IGDBID:      g.ID,
+			Name:        g.Name,
+			CoverURL:    g.CoverURL(),
+			ReleaseYear: g.ReleaseYear(),
+		})
+	}
+	h.renderPartial(w, "match_search_results_partial.html", results)
+}
+
+// MatchReviewSetCandidate stores an IGDB entry the owner picked by hand and marks
+// the row yes, then returns the re-rendered row for an HTMX swap. Picking a match
+// is the verdict itself, so this persists immediately rather than waiting for
+// Save — the page's Save still controls the yes/no radios.
+func (h *Handler) MatchReviewSetCandidate(w http.ResponseWriter, r *http.Request) {
+	gameID := chi.URLParam(r, "id")
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+
+	igdbID, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("igdb_id")), 10, 64)
+	if err != nil || igdbID <= 0 {
+		http.Error(w, "igdb_id required", http.StatusBadRequest)
+		return
+	}
+
+	client := h.igdbClient()
+	if client == nil {
+		http.Error(w, "IGDB credentials are not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	game, err := client.FetchGame(igdbID)
+	if err != nil {
+		log.Printf("MatchReviewSetCandidate fetch %d: %v", igdbID, err)
+		http.Error(w, "IGDB lookup failed", http.StatusBadGateway)
+		return
+	}
+
+	known, err := h.store.MatchedIGDBIDs()
+	if err != nil {
+		log.Printf("MatchReviewSetCandidate matched ids: %v", err)
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	candidate := storesync.CandidateFromGame(gameID, *game, "manual", 0, known[game.ID])
+	if err := h.store.SetManualMatch(candidate); err != nil {
+		log.Printf("MatchReviewSetCandidate save %s: %v", gameID, err)
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	row, err := h.store.GetMatchReviewRow(gameID)
+	if err != nil {
+		log.Printf("MatchReviewSetCandidate reload %s: %v", gameID, err)
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	h.renderPartial(w, "match_row_partial.html", row)
+}
+
 // MatchReviewStatus is polled by the review page while a candidate search runs.
 func (h *Handler) MatchReviewStatus(w http.ResponseWriter, r *http.Request) {
 	h.renderPartial(w, "sync_status_partial.html", h.matchFindStatus())
@@ -239,6 +341,8 @@ func matchConfidenceLabel(confidence string) string {
 		return "word overlap"
 	case "weak":
 		return "weak match"
+	case "manual":
+		return "you picked this"
 	default:
 		return "no candidate"
 	}

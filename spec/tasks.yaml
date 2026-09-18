@@ -494,3 +494,25 @@ tasks:
     scope: [spec/evidence/DEPLOY-009.md]
     outcome: Bobby confirms, then rsync and deploy.sh put the review page on Atlas, creating match_review on startup from schema.sql. Seed the candidates so the queue is usable immediately, and record how many games were searched, how many got a candidate, and the confidence spread. State which part the deployed route is proven to do and which the seed call proved instead.
     acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q 'before' spec/evidence/DEPLOY-009.md", "grep -q 'match_review' spec/evidence/DEPLOY-009.md"]
+
+  # ── Round 2026-09-17 (fourth pass) — ruling in spec/PRODUCT-8.md ──────────
+
+  - id: MATCH-002
+    title: Candidate evidence and inline IGDB search on the review page
+    status: done
+    capability: strong-coder
+    environment: [local]
+    depends_on: [DEPLOY-009]
+    scope: [handlers/match_review.go, templates/match_row_partial.html, templates/match_search_results_partial.html, templates/match_review.html, sync/igdb.go, db/store.go, schema.sql, main.go, spec/evidence/MATCH-002.md]
+    outcome: Bobby reported the queue needs rows inspected one by one. Make it workable without loosening anything further — none of the evidence options change which candidate is found. Store the candidate's IGDB summary, genres, platform names and page URL alongside it so a pairing can be judged without leaving the page, and put an IGDB search box on every row so a wrong or absent candidate can be replaced in place. Picking a result stores it and marks the row yes immediately; the page's Save must keep governing only the yes/no radios. Re-seeding must not move a candidate under an undecided row, and rows already ruled on stay untouched.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'igdb_url' schema.sql", "grep -q 'MATCH-002' spec/evidence/MATCH-002.md"]
+
+  - id: DEPLOY-010
+    title: Deploy the evidence columns and re-seed the candidate queue
+    status: done
+    capability: human
+    environment: [atlas]
+    depends_on: [MATCH-002]
+    scope: [spec/evidence/DEPLOY-010.md]
+    outcome: Check the server tree before rsyncing, deploy, and confirm the startup migration added the four evidence columns. Re-seed the queue so the undecided candidates carry evidence, taking a backup first, and prove the re-seed moved no pairing and changed no verdict by diffing the undecided set before and after. Remove the seeding runner from the container, the host and the tree.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q '85455eb667b3' spec/evidence/DEPLOY-010.md", "grep -q 'byte-identical' spec/evidence/MATCH-002.md"]

@@ -78,7 +78,8 @@ type IGDBGame struct {
 		Name string `json:"name"`
 	} `json:"genres"`
 	Platforms []struct {
-		ID int `json:"id"`
+		ID   int    `json:"id"`
+		Name string `json:"name"`
 	} `json:"platforms"`
 	InvolvedCompanies []struct {
 		Developer bool `json:"developer"`
@@ -156,6 +157,18 @@ func (g IGDBGame) GenreNames() []string {
 	return names
 }
 
+// PlatformNames returns the platform names IGDB lists for the game. The review
+// page shows these so a candidate can be judged without a second tab.
+func (g IGDBGame) PlatformNames() []string {
+	names := make([]string, 0, len(g.Platforms))
+	for _, p := range g.Platforms {
+		if p.Name != "" {
+			names = append(names, p.Name)
+		}
+	}
+	return names
+}
+
 func (c *IGDBClient) query(body string) ([]IGDBGame, error) {
 	if err := c.ensureToken(); err != nil {
 		return nil, err
@@ -182,7 +195,7 @@ func (c *IGDBClient) query(body string) ([]IGDBGame, error) {
 	return results, nil
 }
 
-const igdbFields = "id,name,cover.url,genres.name,summary,first_release_date,url,platforms.id," +
+const igdbFields = "id,name,cover.url,genres.name,summary,first_release_date,url,platforms.id,platforms.name," +
 	"involved_companies.company.name,involved_companies.developer,involved_companies.publisher"
 
 // FetchSteamAppIDs queries the IGDB /games endpoint for the given IGDB game
@@ -365,6 +378,39 @@ func (c *IGDBClient) SearchGamePC(title string) ([]IGDBGame, error) {
 		escaped, igdbFields,
 	)
 	return c.query(body)
+}
+
+// FetchGame loads a single IGDB entry by its id. The review page uses it after
+// a manual search result is picked, so the stored candidate carries the full
+// evidence rather than whatever the search response happened to include.
+func (c *IGDBClient) FetchGame(igdbID int64) (*IGDBGame, error) {
+	results, err := c.query(fmt.Sprintf(`fields %s; where id = %d; limit 1;`, igdbFields, igdbID))
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, fmt.Errorf("IGDB has no game with id %d", igdbID)
+	}
+	return &results[0], nil
+}
+
+// CandidateFromGame is the one place an IGDB entry is turned into a review-queue
+// candidate, so a searched candidate and a hand-picked one are stored identically.
+func CandidateFromGame(gameID string, g IGDBGame, confidence string, score float64, inLibrary bool) db.MatchCandidate {
+	return db.MatchCandidate{
+		GameID:      gameID,
+		IGDBID:      g.ID,
+		IGDBName:    g.Name,
+		CoverURL:    g.CoverURL(),
+		ReleaseYear: g.ReleaseYear(),
+		Confidence:  confidence,
+		Score:       score,
+		InLibrary:   inLibrary,
+		Summary:     g.Summary,
+		Genres:      strings.Join(g.GenreNames(), ", "),
+		Platforms:   strings.Join(g.PlatformNames(), ", "),
+		IGDBURL:     g.URL,
+	}
 }
 
 // bestMatch returns the best IGDB result for the given title. Among exact
@@ -807,16 +853,7 @@ func FindMatchCandidates(store *db.Store, client *IGDBClient, progressFn func(En
 					continue
 				}
 				bestScore = score
-				candidate = db.MatchCandidate{
-					GameID:      g.ID,
-					IGDBID:      results[i].ID,
-					IGDBName:    results[i].Name,
-					CoverURL:    results[i].CoverURL(),
-					ReleaseYear: results[i].ReleaseYear(),
-					Confidence:  label,
-					Score:       score,
-					InLibrary:   known[results[i].ID],
-				}
+				candidate = CandidateFromGame(g.ID, results[i], label, score, known[results[i].ID])
 			}
 			if bestScore > 0 {
 				p.Matched++
