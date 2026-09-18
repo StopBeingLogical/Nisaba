@@ -1,0 +1,157 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}Match Review — NISABA{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full overflow-y-auto">
+
+    <!-- ── Header ─────────────────────────────────────────────── -->
+    <div class="px-6 py-4 border-b border-gray-800 bg-gray-900 sticky top-0 z-20 flex items-center gap-3 flex-wrap">
+        <h1 class="text-lg font-semibold">Match Review</h1>
+        <span class="text-sm text-gray-500">{{ .Counts.Undecided }} undecided of {{ .Counts.Total }}</span>
+        {{ if .Counts.Yes }}<span class="text-xs text-green-400">{{ .Counts.Yes }} yes</span>{{ end }}
+        {{ if .Counts.No }}<span class="text-xs text-red-400">{{ .Counts.No }} no</span>{{ end }}
+
+        <div class="ml-auto flex items-center gap-2">
+            <button hx-post="/match-review/find"
+                    hx-target="#match-find-status"
+                    hx-swap="outerHTML"
+                    class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                Find candidates
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Explanation + job status ───────────────────────────── -->
+    <div class="px-6 py-4 bg-gray-900/50 border-b border-gray-800 flex flex-wrap gap-6">
+        <p class="text-sm text-gray-400 max-w-2xl">
+            These games were never matched to IGDB. The left column is how the game is listed today;
+            the right is the best candidate found. Mark <strong class="text-gray-200">Yes</strong> where
+            the pairing is the same game and <strong class="text-gray-200">No</strong> where it is not,
+            then <strong class="text-gray-200">Save</strong> — anything unmarked stays undecided, so you
+            can work through this over several sittings.
+        </p>
+        <div class="min-w-[18rem]">{{ template "sync_status_partial.html" .FindStatus }}</div>
+    </div>
+
+    <!-- ── Filter tabs ────────────────────────────────────────── -->
+    <div class="px-6 pt-4 flex items-center gap-2">
+        {{ $f := .Filter }}
+        <a href="/match-review?filter=todo" class="px-3 py-1.5 rounded-lg text-sm transition {{ if eq $f "todo" }}bg-amber-600 text-white{{ else }}bg-gray-800 hover:bg-gray-700 text-gray-300{{ end }}">Undecided</a>
+        <a href="/match-review?filter=yes"  class="px-3 py-1.5 rounded-lg text-sm transition {{ if eq $f "yes"  }}bg-amber-600 text-white{{ else }}bg-gray-800 hover:bg-gray-700 text-gray-300{{ end }}">Yes</a>
+        <a href="/match-review?filter=no"   class="px-3 py-1.5 rounded-lg text-sm transition {{ if eq $f "no"   }}bg-amber-600 text-white{{ else }}bg-gray-800 hover:bg-gray-700 text-gray-300{{ end }}">No</a>
+        <a href="/match-review?filter=all"  class="px-3 py-1.5 rounded-lg text-sm transition {{ if eq $f "all"  }}bg-amber-600 text-white{{ else }}bg-gray-800 hover:bg-gray-700 text-gray-300{{ end }}">All</a>
+    </div>
+
+    <!-- ── The queue ──────────────────────────────────────────── -->
+    <form method="POST" action="/match-review/save" class="p-6 flex flex-col gap-3">
+        <input type="hidden" name="filter" value="{{ .Filter }}">
+        <input type="hidden" name="offset" value="{{ .Offset }}">
+
+        {{ range .Rows }}
+        <div class="sync-card flex items-center gap-4">
+            <input type="hidden" name="game_ids" value="{{ .ID }}">
+
+            <!-- Left: the listing as it stands -->
+            <div class="flex items-center gap-3 w-[42%] min-w-0">
+                <div class="shrink-0 w-14 rounded-lg overflow-hidden bg-gray-800">
+                    {{ if .Artwork.Square.URL }}
+                    <img src="{{ .Artwork.Square.URL | proxyURL }}" alt="{{ .Title }}" class="w-full aspect-[2/3] object-cover" />
+                    {{ else }}
+                    <div class="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-gray-500 text-[10px] text-center p-1">no art</div>
+                    {{ end }}
+                </div>
+                <div class="min-w-0">
+                    <div class="text-sm font-medium truncate" title="{{ .Title }}">{{ .Title }}</div>
+                    <div class="flex gap-0.5 mt-1">
+                        {{ range storeList .StoreInfo }}<span class="store-badge store-{{ . }}"></span>{{ end }}
+                    </div>
+                    <div class="text-[11px] text-gray-600 mt-1">no IGDB match</div>
+                </div>
+            </div>
+
+            <!-- Middle: candidate -->
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="text-gray-600 shrink-0">→</div>
+                <div class="shrink-0 w-14 rounded-lg overflow-hidden bg-gray-800">
+                    {{ if .CoverURL }}
+                    <img src="{{ .CoverURL | proxyURL }}" alt="{{ .IGDBName }}" class="w-full aspect-[2/3] object-cover" />
+                    {{ else }}
+                    <div class="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-gray-500 text-[10px] text-center p-1">—</div>
+                    {{ end }}
+                </div>
+                <div class="min-w-0">
+                    {{ if .HasCandidate }}
+                    <div class="text-sm font-medium truncate" title="{{ .IGDBName }}">{{ .IGDBName }}</div>
+                    <div class="flex items-center gap-2 mt-1">
+                        {{ if .ReleaseYear }}<span class="text-[11px] text-gray-500">{{ .ReleaseYear }}</span>{{ end }}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full
+                            {{ if eq .Confidence "exact" }}bg-green-900 text-green-300
+                            {{ else if eq .Confidence "prefix" }}bg-amber-900 text-amber-300
+                            {{ else if eq .Confidence "contains" }}bg-blue-900 text-blue-300
+                            {{ else }}bg-gray-800 text-gray-400{{ end }}">
+                            {{ confidenceLabel .Confidence }}
+                        </span>
+                        {{ if .InLibrary }}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-950 text-red-300" title="This IGDB entry is already matched to another game in the library">
+                            already in library
+                        </span>
+                        {{ end }}
+                    </div>
+                    <div class="text-[11px] text-gray-600 mt-1">IGDB #{{ .IGDBID }}</div>
+                    {{ else }}
+                    <div class="text-sm text-gray-500">No candidate found</div>
+                    <div class="text-[11px] text-gray-600 mt-1">IGDB returned nothing usable for this title</div>
+                    {{ end }}
+                </div>
+            </div>
+
+            <!-- Right: verdict -->
+            <div class="shrink-0 flex items-center gap-3 pl-2">
+                <label class="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+                    <input type="radio" name="decision_{{ .ID }}" value="yes" {{ if .AcceptedYes }}checked{{ end }}
+                           class="accent-green-500 w-4 h-4" />
+                    <span class="text-green-400">Yes</span>
+                </label>
+                <label class="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+                    <input type="radio" name="decision_{{ .ID }}" value="no" {{ if .AcceptedNo }}checked{{ end }}
+                           class="accent-red-500 w-4 h-4" />
+                    <span class="text-red-400">No</span>
+                </label>
+            </div>
+        </div>
+        {{ else }}
+        <div class="text-center text-gray-500 py-16">
+            {{ if eq .Filter "todo" }}Nothing left undecided. Switch to All to revisit your answers.{{ else }}No rows for this filter.{{ end }}
+        </div>
+        {{ end }}
+
+        <!-- Pagination -->
+        {{ if gt .Filtered 0 }}
+        <div class="flex items-center justify-between pt-4 border-t border-gray-800 mt-2">
+            {{ if .HasPrev }}
+            <a href="/match-review?filter={{ .Filter }}&offset={{ .PrevOffset }}" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition">← Previous</a>
+            {{ else }}<span></span>{{ end }}
+            <span class="text-xs text-gray-600">{{ .PageStart }}–{{ .PageEnd }} of {{ .Filtered }}</span>
+            {{ if .HasNext }}
+            <a href="/match-review?filter={{ .Filter }}&offset={{ .NextOffset }}" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition">Next →</a>
+            {{ else }}<span></span>{{ end }}
+        </div>
+        {{ end }}
+
+        <!-- ── Save bar ───────────────────────────────────────── -->
+        {{ if .Rows }}
+        <div class="sticky bottom-0 bg-gray-900/95 border-t border-gray-800 px-4 py-3 flex items-center gap-4 z-30 backdrop-blur-sm">
+            {{ if .Saved }}
+            <span class="text-sm text-green-400">{{ .Saved }} saved</span>
+            {{ end }}
+            <span class="text-xs text-gray-500">Save before paging — answers on this page are not stored until you do.</span>
+            <button type="submit"
+                    class="ml-auto px-5 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold rounded-lg text-sm transition">
+                Save decisions
+            </button>
+        </div>
+        {{ end }}
+    </form>
+</div>
+{{ end }}

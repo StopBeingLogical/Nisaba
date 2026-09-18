@@ -40,6 +40,16 @@ type syncAllState struct {
 	lastMsg string
 }
 
+// matchFindState tracks a running IGDB candidate search for the match review
+// page. It writes only to match_review, never to games.
+type matchFindState struct {
+	mu      sync.Mutex
+	running bool
+	done    int
+	total   int
+	lastMsg string
+}
+
 // pageTemplates lists every template that defines a "content" block (full page).
 var pageTemplates = []string{
 	"dashboard.html",
@@ -52,6 +62,7 @@ var pageTemplates = []string{
 	"settings.html",
 	"logs.html",
 	"review.html",
+	"match_review.html",
 	"mystery_packs.html",
 	"mystery_pack_detail.html",
 }
@@ -74,6 +85,7 @@ type Handler struct {
 	rawgMu     sync.Mutex
 	enrichment  enrichState
 	syncAll     syncAllState
+	matchFind   matchFindState
 	mysteryPack mysteryPackState
 	dataDir     string
 }
@@ -198,7 +210,9 @@ func TemplateFuncMap() template.FuncMap {
 		"priorityColor":   priorityColor,
 		"iterate":         iterate,
 		"sparkline":       sparkline,
-		"storeShortLabel": storeShortLabel,
+		"storeShortLabel":  storeShortLabel,
+		"confidenceLabel":  matchConfidenceLabel,
+		"storeList":        storeList,
 		"seq":             seq,
 		"dict":            dict,
 		"add": func(a, b int) int { return a + b },
@@ -385,6 +399,25 @@ func storeShortLabel(s string) string {
 	default:
 		return s
 	}
+}
+
+// storeList turns the review queue's "store:id,store:id" blob into the store
+// keys the store-badge classes expect.
+func storeList(storeInfo string) []string {
+	if strings.TrimSpace(storeInfo) == "" {
+		return nil
+	}
+	parts := strings.Split(storeInfo, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if i := strings.Index(p, ":"); i >= 0 {
+			p = p[:i]
+		}
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func iterate(start, end int) []int {

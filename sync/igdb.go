@@ -705,3 +705,131 @@ func (c *IGDBClient) SearchIGDBSteamAppID(title string) (string, error) {
 
 	return appID, nil
 }
+
+// ── Match candidates for the review page ─────────────────────────────────────
+
+// scoreMatch ranks how closely an IGDB name relates to a stored title, using
+// progressively looser tests than bestMatch's exact equality, and returns a
+// 0..1 score with a label for the UI.
+//
+// This is deliberately looser than the enrichment path. Nothing here is ever
+// *accepted*: every candidate is put in front of the owner to rule on, so a
+// loose ranking spends review attention rather than corrupting data.
+func scoreMatch(stored, igdbName string) (float64, string) {
+	a := normalizeTitle(stored)
+	b := normalizeTitle(igdbName)
+	if a == "" || b == "" {
+		return 0, "none"
+	}
+	if a == b {
+		return 1, "exact"
+	}
+	// Partial-title tests need at least two words on the shorter side, or a
+	// one-word title swallows everything that starts with it — "Diablo" would
+	// rank "Diablo IV: Season of Divine Intervention" as a strong match.
+	short, long := a, b
+	if len(b) < len(a) {
+		short, long = b, a
+	}
+	if len(strings.Fields(short)) >= 2 {
+		// One title may be a leading run of whole words of the other:
+		// "halcyon 6" vs "halcyon 6 starbase commander".
+		if strings.HasPrefix(long, short+" ") {
+			return 0.85, "prefix"
+		}
+		if strings.Contains(a, b) || strings.Contains(b, a) {
+			return 0.7, "contains"
+		}
+	}
+	inter, union := tokenOverlap(a, b)
+	if union == 0 {
+		return 0, "none"
+	}
+	j := float64(inter) / float64(union)
+	if j >= 0.6 {
+		return 0.5 + 0.2*j, "tokens"
+	}
+	return 0.2 * j, "weak"
+}
+
+// tokenOverlap returns the shared and combined distinct-word counts of two
+// already-normalised titles.
+func tokenOverlap(a, b string) (inter, union int) {
+	as := make(map[string]bool)
+	for _, t := range strings.Fields(a) {
+		as[t] = true
+	}
+	bs := make(map[string]bool)
+	for _, t := range strings.Fields(b) {
+		bs[t] = true
+	}
+	for t := range as {
+		if bs[t] {
+			inter++
+		}
+	}
+	return inter, len(as) + len(bs) - inter
+}
+
+// FindMatchCandidates searches IGDB for every needs_review game and stores the
+// best-ranked result for the owner to approve or reject on the review page.
+//
+// It never writes a match to a game: it only fills the review queue, so a wrong
+// candidate costs nothing but a click. Games already ruled on are skipped by
+// ListGamesNeedingCandidate, and UpsertMatchCandidate refuses to overwrite a
+// decided row, so the pass is safe to re-run.
+func FindMatchCandidates(store *db.Store, client *IGDBClient, progressFn func(EnrichProgress)) error {
+	games, err := store.ListGamesNeedingCandidate()
+	if err != nil {
+		return fmt.Errorf("list games: %w", err)
+	}
+	known, err := store.MatchedIGDBIDs()
+	if err != nil {
+		return fmt.Errorf("matched ids: %w", err)
+	}
+
+	p := EnrichProgress{Total: len(games)}
+	ticker := time.NewTicker(250 * time.Millisecond) // 4 req/sec, as elsewhere
+	defer ticker.Stop()
+
+	for _, g := range games {
+		<-ticker.C
+
+		candidate := db.MatchCandidate{GameID: g.ID, Confidence: "none"}
+		results, err := client.SearchGame(g.Title)
+		if err != nil {
+			p.Errors++
+		} else {
+			bestScore := 0.0
+			for i := range results {
+				score, label := scoreMatch(g.Title, results[i].Name)
+				if score <= bestScore {
+					continue
+				}
+				bestScore = score
+				candidate = db.MatchCandidate{
+					GameID:      g.ID,
+					IGDBID:      results[i].ID,
+					IGDBName:    results[i].Name,
+					CoverURL:    results[i].CoverURL(),
+					ReleaseYear: results[i].ReleaseYear(),
+					Confidence:  label,
+					Score:       score,
+					InLibrary:   known[results[i].ID],
+				}
+			}
+			if bestScore > 0 {
+				p.Matched++
+			}
+		}
+
+		if err := store.UpsertMatchCandidate(candidate); err != nil {
+			p.Errors++
+		}
+		p.Done++
+		if progressFn != nil {
+			progressFn(p)
+		}
+	}
+	return nil
+}

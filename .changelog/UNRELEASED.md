@@ -9,6 +9,7 @@
 ---
 
 ## Top-Level Changes (Major only)
+- A **Match Review** page (`/match-review`) puts each unmatched game beside the best IGDB candidate found for it, with a Yes/No verdict and an explicit Save so the queue can be worked through over several sittings. The search behind it is deliberately looser than enrichment — nothing it finds is applied until you rule on it — and on live it produced candidates for **185 of 328** games with 0 errors (2026-09-17)
 - IGDB's developer and publisher are now stored, and the title matcher tolerates spelling: `publisher` was empty on **all** games because no code path ever wrote it, and the fetch never asked for companies. With `™`/`®`/`©` stripped from the search string, `&` folded to `and`, and roman numerals normalised to arabic, an enrichment pass matched **100 of the 428** never-matched games where the old exact-title test matched 3 — filling 92 publishers and 26 developers, with 0 errors (2026-09-17)
 - The last 2 mergeable duplicate pairs are gone: `DATA-002`'s conflict guard counted `owned = 0` reference links that no query reads, so Wasteland 2: Director's Cut and Heretic were left duplicated after their blockers were deleted. 3388 games now, 5 duplicate groups remaining — each holding two genuine owned store ids for one store (2026-09-17)
 - The library holds 3390 games rather than 4101: 711 duplicate rows created by the Playnite rollout in April were merged into their originals and deleted, leaving nothing without a store link. Duplicate titles (Dragon Age: Origins ×8, Fallout 2 ×5) now appear once (2026-09-17)
@@ -27,6 +28,7 @@
 - Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
+- Added the `match_review` table: one row per unmatched game holding the best IGDB candidate and a **three-valued** verdict (`NULL` undecided / 1 correct / 0 wrong), so a review can be paused and resumed. Store methods list, count, save decisions, upsert a candidate, and return the set of already-matched IGDB ids (2026-09-17)
 - `EnrichGame` now writes `developer` and `publisher`, both through `COALESCE` so an IGDB match fills a gap without overwriting a value a sync or a hand entry already supplied; `EnrichGameParams` carries both (2026-09-17)
 - `multi_store_owned` now counts the game's own owned store links instead of looking for another game row sharing its `igdb_id`. The old test reported 796 games as owned on multiple stores where 102 are — 786 false positives and 92 false negatives (2026-09-17)
 - Added additive `gg_deals_price` / `gg_deals_url` columns to wishlist_entries, with `UpdateWishlistGGDealsComparison()` — GG.deals comparison only, ITAD keeps owning best_current_* and history (2026-09-16)
@@ -45,6 +47,7 @@
 - Added migration: price_thresholds table with 4 seeded default rows (2026-06-28)
 
 ## handlers/ Changes
+- Added `/match-review` with a side-by-side queue, a persisted Yes/No verdict per game, filter tabs (undecided / yes / no / all) and a background candidate search with a progress bar. Rows with a candidate sort first, candidates already matched to another game are flagged, and a cleared radio writes the row back to undecided rather than keeping its old answer (2026-09-17)
 - The full sync now enriches wishlist entries as well as games. The wishlist pass had no caller since commit 9557160, so every entry added after 2026-04-23 arrived with no IGDB id and no cover art — 396 of 676 on the live database (2026-09-17)
 - Playnite runs record to `sync_log` and `sync_errors` as type `ownership`; the old `playnite` value failed the schema's CHECK, so those runs and their errors were silently discarded and never reached Recent Activity (2026-09-16)
 - The full sync no longer runs a GOG wishlist pass — Steam is the only wishlist source, and the GOG settings card now documents itself as the library's credentials (2026-09-16)
@@ -67,6 +70,7 @@
 - Added 3 lowest prices display to wishlist detail page (2026-06-28)
 
 ## sync/ Changes
+- Added `FindMatchCandidates` + `scoreMatch`: for every unmatched game, search IGDB and store the best-ranked candidate with a confidence label (exact / prefix / contains / tokens / weak). It writes only to `match_review` — never to `games` — and skips games already ruled on, so it is safe to re-run. Two guards keep the loose tiers honest: partial-title tests need two words on the shorter title (`Diablo` must not rank `Diablo IV` as a prefix), and a roman numeral must round-trip canonically to count as one (2026-09-17)
 - The IGDB fetch requests `involved_companies.company.name`, `.developer` and `.publisher`, so enrichment can finally learn who made a game; `IGDBGame` gains `DeveloperName()` / `PublisherName()` (2026-09-17)
 - Title matching now equates three classes of spelling variant and nothing more: `searchTitle()` drops `™`/`®`/`©` before the search (a `®` made the query return zero results), `normalizeTitle()` expands `&` to `and`, and canonical roman-numeral tokens become arabic via `romanToArabic()`/`toRoman()` — so `Might and Magic VI` matches `6` and `Orcs & Humans` matches `Orcs and Humans` (2026-09-17)
 - Removed `sync/gog_wishlist.go` — the retired GOG wishlist pass (2026-09-16)

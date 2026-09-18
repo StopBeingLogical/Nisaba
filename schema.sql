@@ -291,3 +291,26 @@ CREATE TABLE IF NOT EXISTS enrichment_queue (
 );
 
 CREATE INDEX IF NOT EXISTS idx_enrichment_queue_status ON enrichment_queue(status);
+
+-- ============================================================
+-- MATCH REVIEW
+-- ============================================================
+
+-- One row per needs_review game: the best IGDB candidate found for it and the
+-- owner's verdict. `decision` is three-valued on purpose — NULL means not yet
+-- reviewed, so a review can be paused and resumed across sessions.
+CREATE TABLE IF NOT EXISTS match_review (
+    game_id      TEXT PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+    igdb_id      INTEGER NOT NULL DEFAULT 0,
+    igdb_name    TEXT    NOT NULL DEFAULT '',
+    cover_url    TEXT    NOT NULL DEFAULT '',
+    release_year TEXT    NOT NULL DEFAULT '',
+    confidence   TEXT    NOT NULL DEFAULT '',   -- exact | prefix | contains | tokens | weak | none
+    score        REAL    NOT NULL DEFAULT 0,
+    in_library   INTEGER NOT NULL DEFAULT 0,    -- candidate igdb_id already matched to another game
+    searched_at  TEXT,
+    decision     INTEGER,                       -- NULL undecided, 1 correct, 0 wrong
+    decided_at   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_match_review_decision ON match_review(decision);

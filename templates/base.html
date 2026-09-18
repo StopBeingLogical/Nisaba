@@ -24,6 +24,9 @@
             <span class="ml-auto text-xs bg-amber-500 text-gray-950 rounded-full px-1.5">{{ .NeedsReview }}</span>
             {{ end }}
         </a>
+        <a href="/match-review" class="nav-link {{ if eq .Page "match-review" }}active{{ end }}">
+            Match Review
+        </a>
         <a href="/sync"     class="nav-link {{ if eq .Page "sync"     }}active{{ end }}">Sync</a>
         <a href="/logs"     class="nav-link {{ if eq .Page "logs"     }}active{{ end }}">Logs</a>
 

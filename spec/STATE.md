@@ -31,6 +31,13 @@ fetch never asked for companies. `ENRICH-001`, `DATA-004`, `DATA-005` and
 `DEPLOY-008` closed them: the library is now **3388 games**, unmatched games
 428 → **328**, and `publisher` is populated for the first time. See below.
 
+A **third pass opened and closed the same day** (`PRODUCT-7.md`): instead of
+loosening the matcher further, `MATCH-001` hands the decision to the owner. The
+**Match Review** page puts each unmatched game beside the best IGDB candidate
+found for it, with a Yes/No verdict that saves per page and survives sessions.
+`DEPLOY-009` shipped it and seeded the queue — **185 of 328** games have a
+candidate. Nothing is applied to `games` yet. See below.
+
 `OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
 rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
 should use `--delete`, and the three dormant fetchers (`SyncSteamDeckStatus`,
@@ -355,12 +362,60 @@ Roughly half sit in IGDB under a decorated or abbreviated name (`Halcyon 6` →
 suffix-stripping matching, which *can* pair a game with the wrong entry, so it
 was left as a question rather than assumed.
 
+## Match review round (2026-09-17) — complete
+
+Bobby: *"Make a review page for unmatched games … the other the most likely match
+from the IGDB that you can find … Add a save button so I can do it in sessions
+instead of all at once. After it's done, I'll have you go through and true up
+based on those."*
+
+This answers the question `PRODUCT-6` left open — how far matching may loosen —
+by moving the decision out of the matcher and into the owner's hands: the search
+may be as loose as it likes because **nothing it finds is ever applied**.
+
+- **`MATCH-001`** — `/match-review`, behind session auth. Left is the game as
+  listed today (cover, title, store badges); right is the best IGDB candidate
+  (cover, name, year, confidence, plus a warning when that IGDB entry is already
+  matched to another game). 25 pairings a page, candidates first.
+- **The verdict is three-valued** — `NULL` undecided / 1 correct / 0 wrong — which
+  is why the control is a radio pair rather than one checkbox: an untouched row
+  and a rejected row must be distinguishable, or the queue could not be resumed
+  across sittings. Every row submits its id, so a cleared radio writes `NULL`
+  back instead of keeping the old answer.
+- **`sync.FindMatchCandidates`** searches IGDB and stores the best-ranked result
+  with a confidence label: exact → prefix → contains → word overlap → weak. Two
+  guards keep the loose tiers honest — partial-title tests need **two words** on
+  the shorter title (without it `Diablo` ranked `Diablo IV: Season of Divine
+  Intervention` as a prefix, and the tier fell 101 → 74 once guarded), and a token
+  counts as a roman numeral only if its canonical spelling round-trips.
+- **Nothing is applied.** It writes only to `match_review`; `games`, `igdb_id`
+  and artwork are untouched. `UpsertMatchCandidate` refuses to overwrite a decided
+  row and the search skips decided games, so it is safe to re-run.
+- **`DEPLOY-009`** — live, image **`afc4167e49b2`** (previous `310c30aa044f`).
+  `match_review` is created on startup from `schema.sql`, so the deploy is the
+  migration. Seeded through the same function the page's button calls: **328 rows,
+  185 with a candidate**, 0 errors — prefix 74 · weak 64 · word overlap 35 ·
+  contains 12 · exact 0 · none 143. `exact` is 0 by construction, since an exactly
+  matching title would already have been matched by enrichment.
+
+**The button path through HTTP is the one thing not exercised** — the seed called
+`FindMatchCandidates` directly, because `/match-review` sits behind session auth
+with no non-interactive trigger. The same shape of limit as `DEPLOY-006` and
+`DEPLOY-008`. Pressing **Find candidates** once closes it, and it is safe to press
+at any time.
+
 ## Next task
 
-None — `DEPLOY-008` closed the enrichment round on 2026-09-17, and
+None — `DEPLOY-009` closed the match review round on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
-**Two gaps are recorded rather than closed, and neither blocks anything.**
+**The queue is ready to work through at `/match-review`**: 328 games, 185 with a
+candidate, all undecided. Answers save per page and survive sessions. **No verdict
+is applied to `games` yet** — the true-up is a separate pass and needs its own
+ruling on what a `yes` should do (link only, or link and re-enrich) and what a
+`no` should do to the game.
+
+**Two older gaps are recorded rather than closed, and neither blocks anything.**
 
 **The enrichment wiring is proven only out-of-band.** `DEPLOY-008`'s backfill
 called `EnrichLibrary`/`EnrichWishlist` directly, so the functions and the live

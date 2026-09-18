@@ -1791,6 +1791,243 @@ func (s *Store) SetEnrichmentStatus(id, status string) error {
 	return err
 }
 
+// ── Match review ──────────────────────────────────────────────────────────────
+// One row per needs_review game holding the best IGDB candidate found for it
+// and the owner's verdict. `decision` is three-valued: NULL means not yet
+// reviewed, so a review can be paused and resumed across sessions.
+
+// MatchReviewRow pairs a needs_review game with its stored IGDB candidate.
+// A row always exists for a game on the page; the candidate fields are empty
+// when the search found nothing, which the template renders as "no candidate".
+type MatchReviewRow struct {
+	ID         string
+	Title      string
+	ArtworkRaw sql.NullString
+	StoreInfo  string
+	IGDBID     int64
+	IGDBName   string
+	CoverURL   string
+	ReleaseYear string
+	Confidence string
+	InLibrary  bool
+	// Decision is NULL when the game has not been ruled on yet.
+	Decision sql.NullInt64
+}
+
+// Artwork parses the game's stored artwork JSON for the listing column.
+func (r MatchReviewRow) Artwork() Artwork { return ParseArtwork(r.ArtworkRaw) }
+
+// HasCandidate is true when a search produced something to rule on.
+func (r MatchReviewRow) HasCandidate() bool { return r.IGDBID != 0 && r.IGDBName != "" }
+
+// AcceptedYes / AcceptedNo drive the radio state in the template.
+func (r MatchReviewRow) AcceptedYes() bool { return r.Decision.Valid && r.Decision.Int64 == 1 }
+func (r MatchReviewRow) AcceptedNo() bool  { return r.Decision.Valid && r.Decision.Int64 == 0 }
+
+// MatchReviewCounts is the per-filter tally shown on the review page.
+type MatchReviewCounts struct {
+	Total     int // every game still needing enrichment
+	Yes       int // ruled correct
+	No        int // ruled wrong
+	Undecided int // Total - Yes - No
+}
+
+func (s *Store) CountMatchReview() (MatchReviewCounts, error) {
+	var c MatchReviewCounts
+	if err := s.db.QueryRow(`
+SELECT COUNT(*) FROM games WHERE enrichment_status = 'needs_review' AND parent_id IS NULL`).Scan(&c.Total); err != nil {
+		return c, err
+	}
+	if err := s.db.QueryRow(`
+SELECT
+    COALESCE(SUM(CASE WHEN m.decision = 1 THEN 1 ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN m.decision = 0 THEN 1 ELSE 0 END), 0)
+FROM games g JOIN match_review m ON m.game_id = g.id
+WHERE g.enrichment_status = 'needs_review' AND g.parent_id IS NULL`).Scan(&c.Yes, &c.No); err != nil {
+		return c, err
+	}
+	c.Undecided = c.Total - c.Yes - c.No
+	return c, nil
+}
+
+// MatchReviewFilter selects which slice of the queue the page shows.
+type MatchReviewFilter string
+
+const (
+	MatchFilterTodo MatchReviewFilter = "todo"
+	MatchFilterYes  MatchReviewFilter = "yes"
+	MatchFilterNo   MatchReviewFilter = "no"
+	MatchFilterAll  MatchReviewFilter = "all"
+)
+
+func (f MatchReviewFilter) predicate() string {
+	switch f {
+	case MatchFilterYes:
+		return "m.decision = 1"
+	case MatchFilterNo:
+		return "m.decision = 0"
+	case MatchFilterAll:
+		return "1 = 1"
+	default:
+		return "m.decision IS NULL"
+	}
+}
+
+// ListMatchReview returns one page of the match-review queue, undecided first.
+func (s *Store) ListMatchReview(filter MatchReviewFilter, offset, limit int) ([]MatchReviewRow, error) {
+	rows, err := s.db.Query(fmt.Sprintf(`
+SELECT
+    g.id, g.title, g.artwork,
+    COALESCE((SELECT GROUP_CONCAT(store || ':' || COALESCE(store_id, ''))
+              FROM game_stores WHERE game_id = g.id AND owned = 1), '') AS store_info,
+    COALESCE(m.igdb_id, 0), COALESCE(m.igdb_name, ''), COALESCE(m.cover_url, ''),
+    COALESCE(m.release_year, ''), COALESCE(m.confidence, ''), COALESCE(m.in_library, 0),
+    m.decision
+FROM games g
+LEFT JOIN match_review m ON m.game_id = g.id
+WHERE g.enrichment_status = 'needs_review' AND g.parent_id IS NULL AND %s
+-- Rows with something to rule on come first, so the top of the queue is
+-- always actionable rather than padded with "no candidate" entries.
+ORDER BY (COALESCE(m.igdb_name, '') <> '') DESC, g.sort_title ASC
+LIMIT ? OFFSET ?`, filter.predicate()), limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []MatchReviewRow
+	for rows.Next() {
+		var r MatchReviewRow
+		if err := rows.Scan(&r.ID, &r.Title, &r.ArtworkRaw, &r.StoreInfo,
+			&r.IGDBID, &r.IGDBName, &r.CoverURL, &r.ReleaseYear, &r.Confidence,
+			&r.InLibrary, &r.Decision); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// CountMatchReviewFilter counts the rows a filter would show, for pagination.
+func (s *Store) CountMatchReviewFilter(filter MatchReviewFilter) (int, error) {
+	var n int
+	err := s.db.QueryRow(fmt.Sprintf(`
+SELECT COUNT(*) FROM games g
+LEFT JOIN match_review m ON m.game_id = g.id
+WHERE g.enrichment_status = 'needs_review' AND g.parent_id IS NULL AND %s`, filter.predicate())).Scan(&n)
+	return n, err
+}
+
+// MatchDecision is one game's verdict: nil clears it back to undecided.
+func (s *Store) SaveMatchDecisions(decisions map[string]*int) (int, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+INSERT INTO match_review (game_id, decision, decided_at)
+VALUES (?, ?, CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END)
+ON CONFLICT(game_id) DO UPDATE SET
+    decision   = excluded.decision,
+    decided_at = excluded.decided_at`)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	n := 0
+	for gameID, decision := range decisions {
+		if _, err := stmt.Exec(gameID, decision, decision); err != nil {
+			return 0, err
+		}
+		n++
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+// ListGamesNeedingCandidate returns every needs_review game still awaiting a
+// verdict. Games already ruled on are skipped so a re-run never re-searches
+// them or moves the candidate under a decision the owner already made.
+func (s *Store) ListGamesNeedingCandidate() ([]GameNeedsReviewRow, error) {
+	rows, err := s.db.Query(`
+SELECT g.id, g.title
+FROM games g
+LEFT JOIN match_review m ON m.game_id = g.id
+WHERE g.enrichment_status = 'needs_review' AND g.parent_id IS NULL
+  AND m.decision IS NULL
+ORDER BY g.sort_title ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []GameNeedsReviewRow
+	for rows.Next() {
+		var r GameNeedsReviewRow
+		if err := rows.Scan(&r.ID, &r.Title); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// MatchCandidate is the best IGDB result found for a needs_review game.
+type MatchCandidate struct {
+	GameID      string
+	IGDBID      int64
+	IGDBName    string
+	CoverURL    string
+	ReleaseYear string
+	Confidence  string
+	Score       float64
+	InLibrary   bool
+}
+
+// UpsertMatchCandidate stores a candidate, leaving any already-decided row
+// untouched so a re-run cannot disturb work the owner has done.
+func (s *Store) UpsertMatchCandidate(c MatchCandidate) error {
+	_, err := s.db.Exec(`
+INSERT INTO match_review (game_id, igdb_id, igdb_name, cover_url, release_year, confidence, score, in_library, searched_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+ON CONFLICT(game_id) DO UPDATE SET
+    igdb_id      = excluded.igdb_id,
+    igdb_name    = excluded.igdb_name,
+    cover_url    = excluded.cover_url,
+    release_year = excluded.release_year,
+    confidence   = excluded.confidence,
+    score        = excluded.score,
+    in_library   = excluded.in_library,
+    searched_at  = CURRENT_TIMESTAMP
+WHERE match_review.decision IS NULL`,
+		c.GameID, c.IGDBID, c.IGDBName, c.CoverURL, c.ReleaseYear, c.Confidence, c.Score, c.InLibrary)
+	return err
+}
+
+// MatchedIGDBIDs returns the igdb_ids already matched to a game, so the review
+// page can warn when a candidate is already in the library.
+func (s *Store) MatchedIGDBIDs() (map[int64]bool, error) {
+	rows, err := s.db.Query(`
+SELECT DISTINCT igdb_id FROM games
+WHERE COALESCE(igdb_id, 0) <> 0 AND enrichment_status <> 'needs_review'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) SetIGDBMatch(gameID, igdbID string) error {
 	_, err := s.db.Exec(
 		`UPDATE games SET igdb_id = ?, enrichment_status = 'manual', last_enriched = CURRENT_TIMESTAMP WHERE id = ?`,

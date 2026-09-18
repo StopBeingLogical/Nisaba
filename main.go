@@ -157,6 +157,12 @@ func main() {
 		r.Post("/review/{id}/match", h.SetMatch)
 		r.Post("/review/{id}/skip", h.SkipMatch)
 
+		// Candidate match review — side-by-side queues with a persisted verdict
+		r.Get("/match-review", h.MatchReview)
+		r.Post("/match-review/save", h.MatchReviewSave)
+		r.Post("/match-review/find", h.MatchReviewFind)
+		r.Get("/match-review/status", h.MatchReviewStatus)
+
 		// GOG token import
 		r.Post("/auth/gog/exchange", h.GOGAuthExchange)
 		r.Post("/auth/gog/push", h.GOGAuthPush)

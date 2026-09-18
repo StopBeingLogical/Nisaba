@@ -472,3 +472,25 @@ tasks:
     scope: [spec/evidence/DEPLOY-008.md]
     outcome: Bobby confirms, then rsync and deploy.sh put the company fetch, the developer and publisher writes, and the widened matcher on Atlas. Then run the enrichment backfill against the live database and record before and after counts for needs_review, developer, and publisher. Name plainly which part is proven by the out-of-band run and which can only be closed by the next Full sync the owner presses.
     acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q 'before' spec/evidence/DEPLOY-008.md", "grep -q 'after' spec/evidence/DEPLOY-008.md"]
+
+  # ── Round 2026-09-17 (third pass) — ruling in spec/PRODUCT-7.md ──────────
+
+  - id: MATCH-001
+    title: Side-by-side match review page for unmatched games
+    status: done
+    capability: strong-coder
+    environment: [local]
+    depends_on: [DEPLOY-008]
+    scope: [handlers/match_review.go, templates/match_review.html, sync/igdb.go, db/store.go, schema.sql, spec/evidence/MATCH-001.md]
+    outcome: A page at /match-review showing each needs_review game beside the best IGDB candidate found for it, with a three-valued Yes/No verdict and an explicit Save, so the queue can be worked over several sittings. Add match_review, a candidate search that is deliberately looser than the enrichment path because it applies nothing, and a background job with a progress bar. Do not write to games: accepting a match must not set igdb_id, fetch artwork, or otherwise link the game — the true-up is a separate ruled pass.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'match_review' schema.sql", "grep -q 'MATCH REVIEW' spec/evidence/MATCH-001.md"]
+
+  - id: DEPLOY-009
+    title: Deploy the match review page and seed the candidates
+    status: done
+    capability: human
+    environment: [atlas]
+    depends_on: [MATCH-001]
+    scope: [spec/evidence/DEPLOY-009.md]
+    outcome: Bobby confirms, then rsync and deploy.sh put the review page on Atlas, creating match_review on startup from schema.sql. Seed the candidates so the queue is usable immediately, and record how many games were searched, how many got a candidate, and the confidence spread. State which part the deployed route is proven to do and which the seed call proved instead.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q 'before' spec/evidence/DEPLOY-009.md", "grep -q 'match_review' spec/evidence/DEPLOY-009.md"]
