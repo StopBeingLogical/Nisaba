@@ -553,18 +553,58 @@ Bobby adopted all three recommendations in full, caveats included.
   Re-seed: 278 searched, 168 with a candidate, 0 errors, **0 rejected entries still
   offered**.
 
+## Match review round, seventh pass (2026-09-17) — the search box was asking the wrong question
+
+Bobby reported that searching `Against the Storm` in the review page's box returned
+the wrong game while IGDB's own website found it.
+
+- **`MATCH-008`** — the game was in IGDB the whole time and our query was not
+  reaching it. Three defects in the query layer, all measured against the live API:
+  `limit 5` truncated it away (the exact entry sat at position 10 of the
+  platform-filtered ranking, 14 unfiltered); IGDB's `search` is a **conjunction over
+  every term matched against the summary as well as the name**, so `Against the
+  Storm` returned *Life is Strange: Before the Storm* (their blurb says "against")
+  and `Fallout 2: A Post Nuclear Role Playing Game` returned **nothing at all**; and
+  `where platforms = (6)` reshaped the ranking rather than merely narrowing it. A
+  search is now a **name-anchored** wildcard lookup merged ahead of the ranked one,
+  25 rows each, with a subtitle retried on both of its possible heads. **Exact matches
+  1 → 10 and usable candidates 7 → 48** across the 110 rows that had none.
+- **`DEPLOY-013`** — live, image **`0bc200e39e63`** (previous `f20da8a75091`).
+  Dry-run first, since a re-seed re-searches rows already looked at: 278 rows,
+  43 gained a candidate, 70 replaced (47 scored higher, **0 lower**), 0 lost,
+  0 errors. Re-seed live in 4m51s: **168 → 211** undecided rows with a candidate,
+  67 without, shortlists 501 → 753. The 50 decided rows are byte-identical.
+
+**Two bugs were caught inside this pass, before deploy.** The client's rate limiting
+had to move: a search is no longer one request, and every caller paced itself per
+*game* at 4 req/sec, so the change would have collected 429s. And the first version
+cut a subtitle at the *first* separator, turning `Warhammer 40,000: Dawn of War II`
+into `Warhammer 40,000` and matching **Dawn of War — the wrong game**; the sample
+caught it, and the rule is now last-separator-first.
+
 ## Next task
 
-None — `DEPLOY-012` closed the sixth pass on 2026-09-17, and
+None — `DEPLOY-013` closed the seventh pass on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
 **The queue is ready to keep working through at `/match-review`**: 278 games still
-undecided, **168 with a candidate** all carrying evidence, 117 of them offering a
-shortlist, and the 110 with nothing to compare against searchable in place — that
-search box also benefits from the cleaning, since pasting a decorated title used to
-return nothing. Answers save per page and survive sessions, and **Apply verdicts**
-is safe to press at any point: it applies whatever is outstanding and does nothing
-when nothing is. The 50 games already accepted are linked and fully enriched.
+undecided, **211 with a candidate** all carrying evidence, 167 of them offering a
+shortlist, and the **67 with nothing to compare against searchable in place** — and
+that search box is now the thing this round fixed. `Against the Storm`, `Fallout 2`
+and `Dragonview` all resolve to the right entry first. Answers save per page and
+survive sessions, and **Apply verdicts** is safe to press at any point. The 50 games
+already accepted are linked and fully enriched.
+
+**The scorer is now the limiting factor, not the search, and that is a ruling to
+make rather than a tweak to slip in** (`spec/OPEN.md`). A wider search finds more
+entries, and the **prefix tier is generous**: when the stored title extends an IGDB
+name the extension need not look like a subtitle, so the re-seed replaced some
+weak-but-correct candidates with confident-but-wrong ones — `Call of Duty: WaW` →
+`Call of Duty`, `STAR WARS™: Rebel Assault 1` → `Star Wars`, `M.A.X.` → `Max`
+(exact, via punctuation stripping). Measured over the queue, 47 replacements scored
+higher and **none scored lower**, so this is the cost of reaching further rather
+than a regression — but a confidently wrong pairing costs a click to reject, and the
+rejection is remembered.
 
 **Two older gaps are recorded rather than closed, and neither blocks anything.**
 

@@ -41,6 +41,25 @@ deleted.
   `*.db` and `imgcache` from deletion); (b) keep the command as it is and remove
   stale paths by hand at each deploy; (c) something else. Not derived into a task.
 
+- **Should the scorer's prefix tier require the extension to look like a subtitle?**
+  Measured 2026-09-17, as a consequence of `MATCH-008` and `DEPLOY-013`. The wider
+  search now reaches entries it never saw, and `scoreMatch`'s prefix tier (0.85)
+  fires whenever the stored title extends an IGDB name by **any** words. Measured
+  effects on the live queue: `Call of Duty: WaW` and `STAR WARS™: Rebel Assault 1`
+  each replaced a weak-but-correct candidate with a confident-but-wrong one
+  (`Call of Duty`, `Star Wars`); `M.A.X.` resolves to IGDB's **`Max`** at the *exact*
+  tier, because punctuation is stripped before comparison; and
+  `Warhammer 40,000: Dawn of War II - Anniversary Edition` scores the franchise
+  prefix. Over the whole queue the re-seed scored 47 replacements higher and **0
+  lower**, so this is the cost of reaching further rather than a regression — but a
+  confidently wrong pairing is presented as plausible, and every one costs a click.
+  Options I can see, not a recommendation: (a) require the extension to be two words
+  or more and not a single acronym token; (b) break score ties by specificity so the
+  **longest** matching IGDB name wins — `Star Wars: TIE Fighter` over `Star Wars`,
+  which would also fix the Dawn of War case; (c) leave it, since a rejection is
+  remembered and the row shows its evidence. Each is cheap to measure against the
+  stored shortlists before it is ruled on. Not derived into a task.
+
 ## Model inferences, unratified
 
 Both original entries here are settled and were deleted, per this file's own

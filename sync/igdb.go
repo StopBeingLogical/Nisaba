@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	stdsync "sync"
 	"time"
 	"unicode"
 
@@ -23,6 +24,28 @@ type IGDBClient struct {
 	accessToken  string
 	tokenExpiry  time.Time
 	http         *http.Client
+
+	// The pacing below lives in the client rather than in each caller because one
+	// search is no longer one request: it is a name-anchored lookup merged with a
+	// ranked search, plus a head-only fallback form. Every caller paced itself at
+	// 250ms per *game*, which after this change puts two to four times that rate on
+	// the wire and collects 429s.
+	throttleMu  stdsync.Mutex
+	lastRequest time.Time
+}
+
+// minRequestInterval paces outgoing IGDB calls at the API's 4 requests per second
+// budget, with a little headroom.
+const minRequestInterval = 270 * time.Millisecond
+
+// throttle blocks until the next request may be sent.
+func (c *IGDBClient) throttle() {
+	c.throttleMu.Lock()
+	defer c.throttleMu.Unlock()
+	if wait := minRequestInterval - time.Since(c.lastRequest); wait > 0 {
+		time.Sleep(wait)
+	}
+	c.lastRequest = time.Now()
 }
 
 func NewIGDBClient(clientID, clientSecret string) *IGDBClient {
@@ -174,6 +197,7 @@ func (c *IGDBClient) query(body string) ([]IGDBGame, error) {
 	if err := c.ensureToken(); err != nil {
 		return nil, err
 	}
+	c.throttle()
 	req, _ := http.NewRequest("POST", "https://api.igdb.com/v4/games",
 		bytes.NewBufferString(body))
 	req.Header.Set("Client-ID", c.clientID)
@@ -293,10 +317,12 @@ func extractSteamAppID(u string) string {
 // so that the deck status sync can check them.
 //
 // Strategy:
-// 1. Batch-fetch websites for all stored igdb_ids; extract Steam App IDs.
-// 2. For games whose stored igdb_id had no Steam website (likely wrong platform
-//    variant matched during enrichment), do a title search filtered to PC
-//    platform (id=6) and re-extract from that result.
+//  1. Batch-fetch websites for all stored igdb_ids; extract Steam App IDs.
+//  2. For games whose stored igdb_id had no Steam website (likely wrong platform
+//     variant matched during enrichment), search by title and re-extract from
+//     that result. The search no longer filters to PC (id=6): that filter
+//     reshaped IGDB's ranking and hid exact entries, while bestMatch already
+//     prefers a PC entry among exact names.
 func SyncSteamCrossRefs(store *db.Store, igdbClient *IGDBClient, progress func(done, total int)) (int, error) {
 	games, err := store.ListGamesNeedingSteamCrossRef()
 	if err != nil {
@@ -334,9 +360,11 @@ func SyncSteamCrossRefs(store *db.Store, igdbClient *IGDBClient, progress func(d
 	}
 
 	// Pass 2: title-based search for games whose stored igdb_id had no Steam
-	// website — the enrichment likely matched a mobile/console variant.
+	// website — the enrichment likely matched a mobile/console variant. bestMatch
+	// already prefers a PC entry among exact names, so the query no longer
+	// filters by platform: doing that reshaped the ranking and hid exact entries.
 	for _, g := range needsFallback {
-		results, err := igdbClient.SearchGamePC(g.Title)
+		results, err := igdbClient.SearchGame(g.Title)
 		if err != nil || len(results) == 0 {
 			continue
 		}
@@ -363,22 +391,222 @@ func SyncSteamCrossRefs(store *db.Store, igdbClient *IGDBClient, progress func(d
 	return inserted, nil
 }
 
-// SearchGame returns up to 5 IGDB results for the given title.
+// Limits on the two search forms. Both were measured against the live API rather
+// than chosen: the correct entry for "Against the Storm" sits at position 10 of
+// the platform-filtered ranked search and position 14 unfiltered, so the limit of
+// 5 this used to ask for truncated the answer away before the scorer saw it.
+const (
+	maxRankedResults   = 25
+	maxAnchoredResults = 25
+)
+
+// SearchGame returns IGDB rows that may correspond to a store title.
+//
+// IGDB's `search` is not a substring matcher and not a relevance engine, and two
+// measured properties of it shape this function:
+//
+//  1. It is a conjunction over *every* term, matched against the summary as well
+//     as the name. So a title carrying a subtitle matches nothing at all
+//     ("Fallout 2: A Post Nuclear Role Playing Game" returns an empty set), and a
+//     title whose words occur in other games' blurbs returns that noise instead
+//     ("Against the Storm" returns Life is Strange: Before the Storm, whose
+//     summary says "against").
+//  2. Its ranking is poor enough that the exact entry for a plain title can sit
+//     well past the first few results.
+//
+// So a search is built from two sources rather than one. A name-anchored wildcard
+// lookup cannot return summary noise and cannot be outranked, so its hits are
+// merged ahead of the ranked ones; a title carrying a subtitle is retried on its
+// head alone when the full form reaches nothing usable.
 func (c *IGDBClient) SearchGame(title string) ([]IGDBGame, error) {
-	escaped := strings.ReplaceAll(searchTitle(title), `"`, `\"`)
-	body := fmt.Sprintf(`search "%s"; fields %s; limit 5;`, escaped, igdbFields)
+	forms := searchForms(title)
+	var merged []IGDBGame
+	seen := make(map[int64]bool)
+	for i, q := range forms {
+		anchored, err := c.searchByName(q)
+		if err != nil {
+			return nil, err
+		}
+		ranked, err := c.searchRanked(q)
+		if err != nil {
+			return nil, err
+		}
+		merged = appendUnique(merged, seen, anchored)
+		merged = appendUnique(merged, seen, ranked)
+		// The full title is the primary form and the heads are fallbacks, so they
+		// cost requests only when the forms tried so far reached nothing confident.
+		// The test is a confident score rather than "any score": a weak hit is
+		// exactly what a title with a real match underneath it scores, and stopping
+		// there would keep the wrong candidate and skip the query that finds the
+		// right one.
+		if i < len(forms)-1 && bestScore(title, merged) >= confidentScore {
+			break
+		}
+	}
+	return merged, nil
+}
+
+// searchForms lists the query forms to try, best first: the undecorated title,
+// then its head cut at the *last* separator, then the same cut at the first.
+//
+// The two heads exist because store titles decorate front and back, and the two
+// ends need opposite treatment. Cutting at the last separator drops a trailing
+// decoration while keeping the game's own name, which is what "Warhammer 40,000:
+// Dawn of War II - Anniversary Edition" needs — cutting at the first separator
+// there yields "Warhammer 40,000", a franchise prefix, and the best it can then
+// score is Dawn of War, the wrong game. Cutting at the first separator is what
+// "Fallout 2: A Post Nuclear Role Playing Game" needs, where the tail is a
+// description rather than a product name. The order matters only for the cost:
+// the loop stops as soon as a form scores confidently, so the narrower head is
+// asked for first.
+func searchForms(title string) []string {
+	cleaned := searchTitle(title)
+	forms := []string{cleaned}
+	add := func(f string) {
+		if f == "" || f == cleaned {
+			return
+		}
+		for _, existing := range forms {
+			if existing == f {
+				return
+			}
+		}
+		forms = append(forms, f)
+	}
+	add(headSearchTitle(cleaned))
+	add(broadHeadSearchTitle(cleaned))
+	return forms
+}
+
+// headSearchTitle cuts at the last separator, keeping as much of the title as
+// still looks like a product name. Two words are required, so "Batman: Arkham
+// Asylum" is not shortened to the far too broad "Batman".
+func headSearchTitle(s string) string {
+	cut := -1
+	for _, sep := range titleSeparators {
+		if i := strings.LastIndex(s, sep); i > 0 && i > cut {
+			cut = i
+		}
+	}
+	return validHead(s, cut)
+}
+
+// broadHeadSearchTitle cuts at the first separator, dropping whatever subtitle or
+// descriptive tail the store appended.
+func broadHeadSearchTitle(s string) string {
+	cut := -1
+	for _, sep := range titleSeparators {
+		if i := strings.Index(s, sep); i > 0 && (cut < 0 || i < cut) {
+			cut = i
+		}
+	}
+	return validHead(s, cut)
+}
+
+var titleSeparators = []string{" - ", " – ", ": "}
+
+func validHead(s string, cut int) string {
+	if cut < 0 {
+		return ""
+	}
+	head := strings.TrimSpace(s[:cut])
+	if len(strings.Fields(head)) < 2 {
+		return ""
+	}
+	return head
+}
+
+// searchByName looks a title up by name rather than by relevance. The wildcard is
+// case-insensitive, so unlike `where name = "..."` — which is case-*sensitive* and
+// returns an empty set for the same name in different case — it cannot fail on
+// capitalisation. Sorting by name keeps a title that *is* the query ahead of the
+// entries that merely contain it, which is what holds the exact entry inside the
+// limit for a query that matches many names.
+func (c *IGDBClient) searchByName(q string) ([]IGDBGame, error) {
+	body := anchoredBody(q)
+	if body == "" {
+		return nil, nil
+	}
 	return c.query(body)
 }
 
-// SearchGamePC returns up to 5 IGDB results for the given title, filtered to
-// games that include PC (Windows) as a platform (platform id = 6).
-func (c *IGDBClient) SearchGamePC(title string) ([]IGDBGame, error) {
-	escaped := strings.ReplaceAll(searchTitle(title), `"`, `\"`)
-	body := fmt.Sprintf(
-		`search "%s"; fields %s; where platforms = (6); limit 5;`,
-		escaped, igdbFields,
+func anchoredBody(q string) string {
+	literal := wildcardLiteral(q)
+	if literal == "" {
+		return ""
+	}
+	return fmt.Sprintf(
+		`where name ~ *"%s"*; fields %s; sort name asc; limit %d;`,
+		literal, igdbFields, maxAnchoredResults,
 	)
-	return c.query(body)
+}
+
+// searchRanked asks IGDB's own relevance search, which reaches variants a name
+// lookup cannot (a store's "Battle Isle 2" to IGDB's "Battle Isle 2200").
+func (c *IGDBClient) searchRanked(q string) ([]IGDBGame, error) {
+	return c.query(rankedBody(q))
+}
+
+func rankedBody(q string) string {
+	escaped := strings.ReplaceAll(q, `"`, `\"`)
+	return fmt.Sprintf(`search "%s"; fields %s; limit %d;`, escaped, igdbFields, maxRankedResults)
+}
+
+// wildcardLiteral strips the characters that would end or unbalance the quoted
+// wildcard literal. A removed character makes the anchor slightly looser, never
+// wrong: scoring still runs against the untouched title afterwards.
+func wildcardLiteral(s string) string {
+	s = strings.NewReplacer(`\`, "", `"`, "", `*`, "", `%`, "").Replace(s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+func appendUnique(dst []IGDBGame, seen map[int64]bool, src []IGDBGame) []IGDBGame {
+	for _, g := range src {
+		if seen[g.ID] {
+			continue
+		}
+		seen[g.ID] = true
+		dst = append(dst, g)
+	}
+	return dst
+}
+
+// RankSearchResults orders search hits so the closest name match to the stored
+// title comes first, regardless of the order IGDB returned them in. The review
+// page's search box uses it, so the entry that *is* the title being searched is
+// the first thing on screen rather than whatever IGDB happened to rank first.
+func RankSearchResults(title string, games []IGDBGame) []IGDBGame {
+	type scored struct {
+		game  IGDBGame
+		score float64
+	}
+	ranked := make([]scored, 0, len(games))
+	for _, g := range games {
+		s, _ := scoreMatch(title, g.Name)
+		ranked = append(ranked, scored{g, s})
+	}
+	sort.SliceStable(ranked, func(a, b int) bool { return ranked[a].score > ranked[b].score })
+	out := make([]IGDBGame, 0, len(ranked))
+	for _, r := range ranked {
+		out = append(out, r.game)
+	}
+	return out
+}
+
+// confidentScore is the tier at which a result is good enough to stop searching:
+// the "contains" tier and above. A weak hit or a zero-scoring one still leaves the
+// fallback forms worth their requests.
+const confidentScore = 0.7
+
+// bestScore reports the highest score any result reaches against the stored title.
+func bestScore(title string, games []IGDBGame) float64 {
+	best := 0.0
+	for _, g := range games {
+		if s, _ := scoreMatch(title, g.Name); s > best {
+			best = s
+		}
+	}
+	return best
 }
 
 // FetchGame loads a single IGDB entry by its id. The review page uses it after
@@ -887,7 +1115,7 @@ func EnrichWishlist(store *db.Store, client *IGDBClient, progressFn func(EnrichP
 // SearchIGDBSteamAppID searches IGDB for a game by title and returns its Steam App ID.
 // Returns ("", nil) if not found or if the game has no Steam website.
 func (c *IGDBClient) SearchIGDBSteamAppID(title string) (string, error) {
-	results, err := c.SearchGamePC(title)
+	results, err := c.SearchGame(title)
 	if err != nil || len(results) == 0 {
 		return "", err
 	}
@@ -927,6 +1155,12 @@ func scoreMatch(stored, igdbName string) (float64, string) {
 		return 0, "none"
 	}
 	if a == b {
+		return 1, "exact"
+	}
+	// Stores concatenate words IGDB spaces out ("Dragonview" for IGDB's "Dragon
+	// View"), and no token test can see through that: the tokens are disjoint, so
+	// the correct entry scored zero and was thrown away.
+	if strings.ReplaceAll(a, " ", "") == strings.ReplaceAll(b, " ", "") {
 		return 1, "exact"
 	}
 	// Partial-title tests need at least two words on the shorter side, or a

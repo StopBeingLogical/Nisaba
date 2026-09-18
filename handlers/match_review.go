@@ -16,6 +16,11 @@ import (
 // matchPageSize is how many game/candidate pairs one page shows.
 const matchPageSize = 25
 
+// maxSearchHits bounds the list the inline search box renders. The search itself
+// merges two sources, so it can return far more rows than a row's dropdown should
+// ever show.
+const maxSearchHits = 15
+
 // igdbClient returns the shared IGDB client, building it from config on first
 // use. Returns nil when the credentials are not configured.
 func (h *Handler) igdbClient() *storesync.IGDBClient {
@@ -229,11 +234,17 @@ func (h *Handler) MatchReviewSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	games, err := client.SearchGamePC(q)
+	games, err := client.SearchGame(q)
 	if err != nil {
 		log.Printf("MatchReviewSearch %s: %v", q, err)
 		http.Error(w, "IGDB search failed", http.StatusBadGateway)
 		return
+	}
+	// Closest name match first: the search merges a name-anchored lookup with
+	// IGDB's own ranking, so IGDB's order is not the order to show.
+	games = storesync.RankSearchResults(q, games)
+	if len(games) > maxSearchHits {
+		games = games[:maxSearchHits]
 	}
 
 	results := make([]matchSearchResult, 0, len(games))
