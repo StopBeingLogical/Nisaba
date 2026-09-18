@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"strconv"
@@ -305,15 +306,28 @@ func (h *Handler) UpdateUserData(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`<span class="text-green-400">Saved.</span>`))
 }
 
-// Rehydrate queues a single game for metadata rehydration.
+// Rehydrate re-fetches one game's metadata from IGDB and writes it.
+//
+// This used to enqueue a row into `enrichment_queue` and answer "Queued." — but
+// nothing anywhere drained that table, so the button did nothing at all. It now
+// does the work and reports what happened.
 func (h *Handler) Rehydrate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if err := h.store.EnqueueEnrichment("game", id); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+
+	client := h.igdbClient()
+	if client == nil {
+		http.Error(w, "IGDB credentials are not configured", http.StatusServiceUnavailable)
 		return
 	}
+
+	msg, err := storesync.RehydrateGame(h.store, client, id)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(`<span class="text-green-400 text-xs">Queued.</span>`))
+	if err != nil {
+		log.Printf("Rehydrate %s: %v", id, err)
+		_, _ = w.Write([]byte(`<span class="text-red-400 text-xs">Rehydrate failed — see logs.</span>`))
+		return
+	}
+	_, _ = fmt.Fprintf(w, `<span class="text-green-400 text-xs">%s</span>`, template.HTMLEscapeString(msg))
 }
 
 // AddGameForm renders the manual game entry form.
@@ -451,9 +465,17 @@ func (h *Handler) CreateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If an IGDB result was selected, mark as matched (skip review queue).
+	// If an IGDB result was selected, link and enrich it. This previously called
+	// SetIGDBMatch alone, which marked the game `manual` — outside the enrichment
+	// pool — so the chosen entry was linked but never actually fetched.
 	if igdbID != "" {
-		_ = h.store.SetIGDBMatch(id, igdbID)
+		if client := h.igdbClient(); client != nil {
+			if err := storesync.ApplySingleMatch(h.store, client, id, igdbID); err != nil {
+				log.Printf("AddGame enrich %s: %v", id, err)
+			}
+		} else {
+			_ = h.store.SetIGDBMatch(id, igdbID)
+		}
 	}
 
 	if store := r.FormValue("store"); store != "" {

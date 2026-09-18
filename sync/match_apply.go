@@ -121,13 +121,39 @@ func ApplyMatchVerdicts(store *db.Store, client *IGDBClient, progressFn func(App
 			rejected[row.ID][row.IGDBID] = true
 		}
 
-		results, err := client.SearchGame(row.Title)
-		candidate, score := db.MatchCandidate{GameID: row.ID, Confidence: "none"}, 0.0
+		// Promote the next alternative the shortlist already holds. This is the
+		// cheap path and the better one: the stored ranking is where the scorer's
+		// remaining choices already live, so there is nothing to gain by asking
+		// again — and a fresh search would only re-derive the same lower ranks.
+		candidate, found, err := store.NextStoredCandidate(row.ID)
 		if err != nil {
-			log.Printf("apply verdicts: search %q: %v", row.Title, err)
+			log.Printf("apply verdicts: next candidate %s: %v", row.ID, err)
 			p.Errors++
-		} else {
-			candidate, score = bestCandidate(row.Title, row.ID, results, known, rejected[row.ID])
+			p.Done++
+			report()
+			continue
+		}
+
+		// Rows seeded before shortlists existed have nothing stored, so fall back to
+		// one search to seed their alternatives.
+		if !found {
+			results, err := client.SearchGame(row.Title)
+			if err != nil {
+				log.Printf("apply verdicts: search %q: %v", row.Title, err)
+				p.Errors++
+			} else {
+				ranked := rankCandidates(row.Title, row.ID, results, known, rejected[row.ID])
+				if err := store.ReplaceMatchCandidates(row.ID, ranked); err != nil {
+					log.Printf("apply verdicts: store candidates %s: %v", row.ID, err)
+					p.Errors++
+				}
+				if len(ranked) > 0 {
+					candidate, found = ranked[0], true
+				}
+			}
+		}
+		if !found {
+			candidate = db.MatchCandidate{GameID: row.ID, Confidence: "none"}
 		}
 
 		// The verdict is cleared before the new candidate is written, because
@@ -147,7 +173,7 @@ func ApplyMatchVerdicts(store *db.Store, client *IGDBClient, progressFn func(App
 			continue
 		}
 
-		if score > 0 {
+		if found {
 			p.Rematch++
 			known[candidate.IGDBID] = true
 		} else {

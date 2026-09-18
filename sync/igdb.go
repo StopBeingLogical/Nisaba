@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -456,27 +457,60 @@ func enrichFromIGDB(store *db.Store, gameID string, match IGDBGame) error {
 	return nil
 }
 
-// bestCandidate picks the highest-scoring IGDB result for a title, skipping any
-// entry the owner has already rejected for this game.
+// maxStoredCandidates bounds the shortlist kept per game. Three are shown (the
+// primary plus two alternates); a couple spare leaves room for rejections without
+// needing another search.
+const maxStoredCandidates = 5
+
+// rankCandidates scores every IGDB result for a title and returns the usable ones
+// best-first, skipping entries the owner has already rejected for this game.
 //
-// The exclusion is what makes the match-review page's "try again" meaningful: the
-// search is deterministic, so without it a re-match would offer the same wrong
-// answer it was just told to discard. A zero score means nothing usable was left.
-func bestCandidate(title, gameID string, results []IGDBGame, known, rejected map[int64]bool) (db.MatchCandidate, float64) {
-	best := db.MatchCandidate{GameID: gameID, Confidence: "none"}
-	bestScore := 0.0
+// The exclusion is what makes "try again" meaningful: the search is deterministic,
+// so without it a re-match would offer back the exact candidate it was just told to
+// discard.
+//
+// Returning the whole ranking, not just the winner, is what lets the review page
+// offer a shortlist: measured against live, re-searching after a rejection never
+// once produced a better-tier match, so the scorer's ranking past the first entry
+// is not trustworthy enough to pick from on the owner's behalf.
+func rankCandidates(title, gameID string, results []IGDBGame, known, rejected map[int64]bool) []db.MatchCandidate {
+	type scored struct {
+		candidate db.MatchCandidate
+		score     float64
+	}
+	ranked := make([]scored, 0, len(results))
 	for i := range results {
 		if rejected[results[i].ID] {
 			continue
 		}
 		score, label := scoreMatch(title, results[i].Name)
-		if score <= bestScore {
+		if score <= 0 {
 			continue
 		}
-		bestScore = score
-		best = CandidateFromGame(gameID, results[i], label, score, known[results[i].ID])
+		ranked = append(ranked, scored{
+			candidate: CandidateFromGame(gameID, results[i], label, score, known[results[i].ID]),
+			score:     score,
+		})
 	}
-	return best, bestScore
+	sort.SliceStable(ranked, func(a, b int) bool { return ranked[a].score > ranked[b].score })
+
+	if len(ranked) > maxStoredCandidates {
+		ranked = ranked[:maxStoredCandidates]
+	}
+	out := make([]db.MatchCandidate, 0, len(ranked))
+	for _, r := range ranked {
+		out = append(out, r.candidate)
+	}
+	return out
+}
+
+// bestCandidate is the single winner of a ranking, for callers that want one.
+func bestCandidate(title, gameID string, results []IGDBGame, known, rejected map[int64]bool) (db.MatchCandidate, float64) {
+	ranked := rankCandidates(title, gameID, results, known, rejected)
+	if len(ranked) == 0 {
+		return db.MatchCandidate{GameID: gameID, Confidence: "none"}, 0
+	}
+	return ranked[0], ranked[0].Score
 }
 
 // bestMatch returns the best IGDB result for the given title. Among exact
@@ -584,9 +618,98 @@ func toRoman(n int) string {
 // searchTitle prepares a store-supplied title for the IGDB search endpoint.
 // Trademark symbols are absent from IGDB names and make the search return
 // nothing for titles that carry them.
+// searchTitle renders a stored title as a query for IGDB's search endpoint.
+//
+// IGDB's `search` is literal: a decorated title returns an empty set rather than
+// partial matches. Measured against the live API, `Batman: Arkham Asylum GOTY
+// Edition`, `Baldur's Gate: The Original Saga`, `Astebreed: Definitive Edition`,
+// `BloodNet (FDD version)` and `Amerzone: The Explorer's Legacy (1999)` all
+// returned **zero** results, while the undecorated title returned the game every
+// time. So store decorations are stripped here, before the query, and nowhere
+// else: scoring still runs against the raw title, so a wider search can only
+// reach a match — it cannot re-rank one.
 func searchTitle(s string) string {
-	s = strings.NewReplacer("™", " ", "®", " ", "©", " ", "\u00a0", " ").Replace(s)
-	return strings.Join(strings.Fields(s), " ")
+	s = strings.NewReplacer("™", "", "®", "", "©", "", "\u00a0", " ").Replace(s)
+	s = strings.Join(strings.Fields(s), " ")
+	// Removing a trademark can leave a space before punctuation, as in "Batman :".
+	s = strings.NewReplacer(" :", ":", " ,", ",", " .", ".", " ;", ";").Replace(s)
+
+	cleaned := cleanSearchTitle(s)
+	// Never let cleaning empty a title the search could still use.
+	if cleaned == "" {
+		return s
+	}
+	return cleaned
+}
+
+// searchEditionSuffixes are trailing store decorations that carry no weight with
+// IGDB's search. Each includes its leading space so it only matches on a word
+// boundary, and the separator before it (" - ", ": ", ", ") is trimmed after the
+// fact, so one entry covers "… GOTY Edition", "…: GOTY Edition" and "… - GOTY
+// Edition". Longer phrases come first so "… Complete Edition" is not left as "…
+// Complete".
+//
+// Deliberately *not* here: variant products that are genuinely different games,
+// such as "Christmas Edition" or "Scenery CD" — stripping those would send the
+// search after the wrong entry entirely.
+var searchEditionSuffixes = []string{
+	" game of the year edition", " goty edition",
+	" definitive edition", " deluxe edition",
+	" complete edition", " enhanced edition",
+	" special edition", " collector's edition",
+	" ultimate edition", " gold edition",
+	" premium edition", " the original saga",
+	" goty", " deluxe",
+}
+
+// searchSeparators are trimmed from the end of a title after a decoration is
+// removed, so "Baldur's Gate:" becomes "Baldur's Gate".
+const searchSeparators = " -:,|"
+
+func trimSearchSeparators(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), searchSeparators+" ")
+}
+
+// cleanSearchTitle removes trailing decoration until the title stops shrinking:
+// a parenthesised note or year, an edition suffix, and a trailing bundle part.
+func cleanSearchTitle(s string) string {
+	cur := strings.TrimSpace(s)
+	for {
+		prev := cur
+
+		// A trailing "(...)" or "[...]" note, e.g. "BloodNet (FDD version)".
+		if strings.HasSuffix(cur, ")") {
+			if i := strings.LastIndex(cur, "("); i > 0 {
+				cur = strings.TrimSpace(cur[:i])
+			}
+		} else if strings.HasSuffix(cur, "]") {
+			if i := strings.LastIndex(cur, "["); i > 0 {
+				cur = strings.TrimSpace(cur[:i])
+			}
+		}
+
+		// A trailing bundle, e.g. "Besiege + The Splintered Sea DLC".
+		if i := strings.Index(cur, " + "); i > 0 {
+			cur = strings.TrimSpace(cur[:i])
+		}
+
+		// An edition/collection suffix.
+		lower := strings.ToLower(cur)
+		for _, suffix := range searchEditionSuffixes {
+			if strings.HasSuffix(lower, suffix) {
+				cur = trimSearchSeparators(cur[:len(cur)-len(suffix)])
+				break
+			}
+		}
+
+		if cur == prev {
+			break
+		}
+		if len(cur) < 2 {
+			return s
+		}
+	}
+	return cur
 }
 
 // ── Bulk enrichment ───────────────────────────────────────────────────────────
@@ -883,14 +1006,20 @@ func FindMatchCandidates(store *db.Store, client *IGDBClient, progressFn func(En
 	for _, g := range games {
 		<-ticker.C
 
-		candidate, bestScore := db.MatchCandidate{GameID: g.ID, Confidence: "none"}, 0.0
+		candidate := db.MatchCandidate{GameID: g.ID, Confidence: "none"}
 		results, err := client.SearchGame(g.Title)
 		if err != nil {
 			p.Errors++
 		} else {
-			candidate, bestScore = bestCandidate(g.Title, g.ID, results, known, rejected[g.ID])
-			if bestScore > 0 {
+			// Keep the whole ranking so the row can offer alternatives, and make the
+			// best of it the row's current candidate.
+			ranked := rankCandidates(g.Title, g.ID, results, known, rejected[g.ID])
+			if len(ranked) > 0 {
+				candidate = ranked[0]
 				p.Matched++
+			}
+			if err := store.ReplaceMatchCandidates(g.ID, ranked); err != nil {
+				p.Errors++
 			}
 		}
 

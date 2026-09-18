@@ -261,11 +261,6 @@ type GenreCount struct {
 
 // ── Enrichment queue count ───────────────────────────────────────────────────
 
-type QueueCounts struct {
-	Pending int
-	Running int
-	Failed  int
-}
 
 // ── Dashboard stats ───────────────────────────────────────────────────────────
 

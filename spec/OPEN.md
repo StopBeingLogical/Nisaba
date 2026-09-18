@@ -6,27 +6,6 @@ deleted.
 
 ## Awaiting a ruling
 
-- **`enrichment_queue` has no consumer — delete the machinery, or give it one?**
-  Measured 2026-09-17: a `grep` for `enrichment_queue` across every `*.go` and
-  `*.sql` file returns exactly two references — the `INSERT` in
-  `EnqueueEnrichment` (`db/store.go:1729`) and a `COUNT` in `QueueCounts`
-  (`db/store.go:1739`). **Nothing ever reads a row to process it**, and no
-  function anywhere selects a queued entity (`FROM enrichment_queue` and
-  `status = 'pending'` both match only those two sites). The live table is
-  therefore a write-only ledger, and the consequence is a real one: the older
-  `/review` page's manual match calls `SetIGDBMatch`, which sets
-  `enrichment_status = 'manual'` — removing the game from the pool
-  `EnrichLibrary` selects (`WHERE enrichment_status = 'needs_review'`) — and then
-  enqueues into the queue nobody drains. Its comment claims "the enrichment
-  pipeline handles the rest"; it does not. **A game manually matched from
-  `/review` is linked and never enriched.** Found while building the match-review
-  true-up (`MATCH-004`), which deliberately avoided that path and used the
-  pipeline's own per-game write instead. Options I can see, not a recommendation:
-  (a) delete `enrichment_queue`, `EnqueueEnrichment`, `QueueCounts` and the
-  `/review` call site, and have manual matches enrich directly as the true-up now
-  does; (b) build the missing consumer so the queue means something again;
-  (c) leave both dormant but correct the misleading comment. Not derived into a
-  task, and **`/review` still links without enriching** until this is ruled.
 - **Should the Steam Deck, ProtonDB and Steam cross-ref fetchers be wired back
   up, or deleted?** Measured 2026-09-17: `SyncSteamDeckStatus`
   (`sync/steam_deck.go:25`), `SyncProtonRatings` (`sync/protondb.go:24`) and
@@ -70,6 +49,16 @@ page 1 5.63s → 0.081s live), and ITAD was adopted as the pricing provider
 (`PRODUCT.md`, `GG-002`).
 
 ## Resolved
+- **`enrichment_queue` has no consumer — delete the machinery, or give it one?** →
+  ruled 2026-09-17: **delete it, and fix the call sites.** Measured: the table was
+  write-only (`EnqueueEnrichment` inserted, `QueueCounts` counted, nothing read) and
+  held **0 rows**, with **0 games** marked `manual` — so the bug had never fired.
+  It had three call sites: `/review`'s manual match linked a game and never enriched
+  it, the **`Rehydrate`** button answered "Queued." and did nothing at all, and
+  manual game add linked without fetching. All three now enrich through the shared
+  `enrichFromIGDB` path (`sync/enrich_single.go`); the table is dropped by an
+  idempotent migration. Executed by `MATCH-007`, deployed in `DEPLOY-012`. Ruling in
+  `PRODUCT-10.md` §3.
 
 - **`/library` target** → ruled 2026-08-01: under 1 second, page 1 and any
   later page. Moved to `PRODUCT.md`.

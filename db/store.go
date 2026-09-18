@@ -1726,25 +1726,12 @@ func (s *Store) AllConfig() (map[string]string, error) {
 
 // ── Enrichment queue ──────────────────────────────────────────────────────────
 
-func (s *Store) EnqueueEnrichment(entityType, entityID string) error {
-	_, err := s.db.Exec(`
-INSERT INTO enrichment_queue (entity_type, entity_id, status)
-VALUES (?, ?, 'pending')
-ON CONFLICT(entity_type, entity_id) DO UPDATE SET status = 'pending', attempts = 0, last_error = NULL`,
-		entityType, entityID,
-	)
-	return err
-}
-
-func (s *Store) QueueCounts() (QueueCounts, error) {
-	var q QueueCounts
-	err := s.db.QueryRow(`
-SELECT
-    COUNT(*) FILTER (WHERE status = 'pending'),
-    COUNT(*) FILTER (WHERE status = 'running'),
-    COUNT(*) FILTER (WHERE status = 'failed')
-FROM enrichment_queue`).Scan(&q.Pending, &q.Running, &q.Failed)
-	return q, err
+// GameEnrichTarget returns one game's title and stored IGDB id, for the
+// single-game enrichment paths. igdbID is empty when the game has no match yet.
+func (s *Store) GameEnrichTarget(gameID string) (title, igdbID string, err error) {
+	var t, i sql.NullString
+	err = s.db.QueryRow(`SELECT title, igdb_id FROM games WHERE id = ?`, gameID).Scan(&t, &i)
+	return t.String, i.String, err
 }
 
 // ── Review queue ──────────────────────────────────────────────────────────────
@@ -1817,6 +1804,28 @@ type MatchReviewRow struct {
 	IGDBURL   string
 	// Decision is NULL when the game has not been ruled on yet.
 	Decision sql.NullInt64
+	// Alt holds the lower-ranked candidates from the last search, so the row can
+	// offer a shortlist rather than a single take-it-or-leave-it pairing. Empty for
+	// rows seeded before shortlists existed, which falls back to the primary alone.
+	Alt []MatchCandidateView
+}
+
+// Alternates returns the shortlist to offer alongside the primary candidate,
+// capped so a row stays readable. The primary is excluded — it is shown above
+// them — and rejected entries never reach here (the query filters them).
+func (r MatchReviewRow) Alternates() []MatchCandidateView {
+	const maxAlternates = 2
+	out := make([]MatchCandidateView, 0, maxAlternates)
+	for _, c := range r.Alt {
+		if c.IGDBID == r.IGDBID {
+			continue
+		}
+		if len(out) == maxAlternates {
+			break
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 // maxSummaryChars / maxPlatforms bound what one row renders, so a long IGDB
@@ -1966,7 +1975,25 @@ LIMIT ? OFFSET ?`, filter.predicate()), limit, offset)
 		}
 		result = append(result, r)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Close before the next query: this store is limited to one connection, so a
+	// second query issued while these rows are open would block on itself.
+	rows.Close()
+
+	ids := make([]string, 0, len(result))
+	for _, r := range result {
+		ids = append(ids, r.ID)
+	}
+	alts, err := s.MatchCandidatesFor(ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range result {
+		result[i].Alt = alts[result[i].ID]
+	}
+	return result, nil
 }
 
 // CountMatchReviewFilter counts the rows a filter would show, for pagination.
@@ -2124,7 +2151,123 @@ WHERE g.id = ?`, gameID).Scan(&r.ID, &r.Title, &r.ArtworkRaw, &r.StoreInfo,
 		&r.IGDBID, &r.IGDBName, &r.CoverURL, &r.ReleaseYear, &r.Confidence,
 		&r.InLibrary, &r.Summary, &r.Genres, &r.Platforms, &r.IGDBURL,
 		&r.Decision)
-	return r, err
+	if err != nil {
+		return r, err
+	}
+	alts, err := s.MatchCandidatesFor([]string{gameID})
+	if err != nil {
+		return r, err
+	}
+	r.Alt = alts[gameID]
+	return r, nil
+}
+
+// MatchCandidateView is one alternative offer on a review row — enough to render
+// and to pick, without the evidence blocks the primary candidate carries.
+type MatchCandidateView struct {
+	IGDBID      int64
+	IGDBName    string
+	CoverURL    string
+	ReleaseYear string
+	Confidence  string
+	InLibrary   bool
+}
+
+// ReplaceMatchCandidates stores the ranked candidates a search found for a game,
+// replacing any previous set. Called by the finder, which only ever works on rows
+// with no verdict, so this cannot disturb a decided row.
+func (s *Store) ReplaceMatchCandidates(gameID string, cands []MatchCandidate) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM match_review_candidates WHERE game_id = ?`, gameID); err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`
+INSERT INTO match_review_candidates
+    (game_id, igdb_id, rank, igdb_name, cover_url, release_year, confidence, score, in_library, searched_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for i, c := range cands {
+		if _, err := stmt.Exec(gameID, c.IGDBID, i+1, c.IGDBName, c.CoverURL,
+			c.ReleaseYear, c.Confidence, c.Score, c.InLibrary); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// MatchCandidatesFor loads the stored shortlists for the games on one page, in a
+// single query, keyed by game id and ordered best-first. Entries the owner has
+// rejected are left out, so a rejected candidate can never be offered again.
+func (s *Store) MatchCandidatesFor(gameIDs []string) (map[string][]MatchCandidateView, error) {
+	out := map[string][]MatchCandidateView{}
+	if len(gameIDs) == 0 {
+		return out, nil
+	}
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(gameIDs)), ",")
+	args := make([]any, 0, len(gameIDs))
+	for _, id := range gameIDs {
+		args = append(args, id)
+	}
+
+	rows, err := s.db.Query(fmt.Sprintf(`
+SELECT c.game_id, c.igdb_id, c.igdb_name, c.cover_url, c.release_year, c.confidence, c.in_library
+FROM match_review_candidates c
+WHERE c.game_id IN (%s)
+  AND NOT EXISTS (
+      SELECT 1 FROM match_review_rejections r
+      WHERE r.game_id = c.game_id AND r.igdb_id = c.igdb_id)
+ORDER BY c.game_id, c.rank ASC`, placeholders), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var gameID string
+		var v MatchCandidateView
+		if err := rows.Scan(&gameID, &v.IGDBID, &v.IGDBName, &v.CoverURL,
+			&v.ReleaseYear, &v.Confidence, &v.InLibrary); err != nil {
+			return nil, err
+		}
+		out[gameID] = append(out[gameID], v)
+	}
+	return out, rows.Err()
+}
+
+// NextStoredCandidate returns the best-ranked stored candidate for a game that
+// the owner has not already rejected, and whether one exists. This is what lets a
+// "no" promote the next alternative from the shortlist already on file instead of
+// spending another API search on a result that was ranked lower anyway.
+func (s *Store) NextStoredCandidate(gameID string) (MatchCandidate, bool, error) {
+	var row MatchCandidate
+	err := s.db.QueryRow(`
+SELECT c.igdb_id, c.igdb_name, c.cover_url, c.release_year, c.confidence, c.score, c.in_library
+FROM match_review_candidates c
+WHERE c.game_id = ?
+  AND NOT EXISTS (
+      SELECT 1 FROM match_review_rejections r
+      WHERE r.game_id = c.game_id AND r.igdb_id = c.igdb_id)
+ORDER BY c.rank ASC
+LIMIT 1`, gameID).Scan(&row.IGDBID, &row.IGDBName, &row.CoverURL,
+		&row.ReleaseYear, &row.Confidence, &row.Score, &row.InLibrary)
+	if err == sql.ErrNoRows {
+		return MatchCandidate{}, false, nil
+	}
+	if err != nil {
+		return MatchCandidate{}, false, err
+	}
+	row.GameID = gameID
+	return row, true, nil
 }
 
 // RecordMatchRejection remembers that the owner ruled out an IGDB entry for a

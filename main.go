@@ -231,6 +231,12 @@ func runMigrations(sqlDB *sql.DB) error {
 		`ALTER TABLE wishlist_entries ADD COLUMN best_price_url TEXT`,
 		`ALTER TABLE wishlist_entries ADD COLUMN gg_deals_price REAL`,
 		`ALTER TABLE wishlist_entries ADD COLUMN gg_deals_url TEXT`,
+		`CREATE TABLE IF NOT EXISTS match_review_rejections (
+			game_id     TEXT    NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+			igdb_id     INTEGER NOT NULL,
+			rejected_at TEXT    NOT NULL DEFAULT (datetime('now')),
+			PRIMARY KEY (game_id, igdb_id)
+		)`,
 		// Evidence columns on the match-review queue (see schema.sql).
 		`ALTER TABLE match_review ADD COLUMN summary TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE match_review ADD COLUMN genres TEXT NOT NULL DEFAULT ''`,
@@ -304,6 +310,11 @@ func runMigrations(sqlDB *sql.DB) error {
 			url        TEXT,
 			recorded_at TEXT NOT NULL
 		)`,
+		// `enrichment_queue` was write-only — nothing ever drained it — so the code
+		// that used it now enriches directly. Dropping it is safe: the table has
+		// never held a row (measured 2026-09-17, 0 rows and 0 games marked
+		// 'manual'), and nothing reads it. Idempotent, like the rest of this list.
+		`DROP TABLE IF EXISTS enrichment_queue`,
 		`CREATE INDEX IF NOT EXISTS idx_game_genres_game_id ON game_genres(game_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_game_tags_game_id ON game_tags(game_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_game_stores_game_id_owned ON game_stores(game_id, owned)`,

@@ -72,6 +72,41 @@
             <div class="text-[11px] text-gray-600 mt-1">IGDB returned nothing usable for this title — search for it below.</div>
             {{ end }}
 
+            {{ if .Alternates }}
+            <!-- Lower-ranked candidates from the same search. The scorer's ordering
+                 past the first hit is unreliable, so these are offered rather than
+                 decided for the owner. -->
+            <div class="mt-2 pt-2 border-t border-gray-800">
+                <div class="text-[10px] text-gray-600 mb-1">Other options from the same search</div>
+                <div class="flex flex-col gap-1">
+                    {{ range .Alternates }}
+                    <div class="flex items-center gap-2">
+                        {{ if .CoverURL }}
+                        <img src="{{ .CoverURL | proxyURL }}" alt="{{ .IGDBName }}" class="w-6 h-8 rounded object-cover shrink-0" />
+                        {{ else }}
+                        <div class="w-6 h-8 rounded bg-gray-700 shrink-0"></div>
+                        {{ end }}
+                        <div class="flex-1 min-w-0">
+                            <div class="text-[11px] text-gray-300 truncate" title="{{ .IGDBName }}">{{ .IGDBName }}</div>
+                            <div class="text-[10px] text-gray-600">
+                                {{ if .ReleaseYear }}{{ .ReleaseYear }} · {{ end }}{{ confidenceLabel .Confidence }}
+                                {{ if .InLibrary }} · already in library{{ end }}
+                            </div>
+                        </div>
+                        <button type="button"
+                                hx-post="/match-review/{{ $.ID }}/candidate"
+                                hx-vals='{"igdb_id": "{{ .IGDBID }}"}'
+                                hx-target="#match-row-{{ $.ID }}"
+                                hx-swap="outerHTML"
+                                class="shrink-0 px-2 py-0.5 bg-gray-700 hover:bg-amber-500 hover:text-gray-950 text-gray-200 text-[10px] font-semibold rounded transition">
+                            Use this
+                        </button>
+                    </div>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+
             <!-- Manual search. Open by default when there is nothing to compare. -->
             <details class="mt-2" {{ if not .HasCandidate }}open{{ end }}>
                 <summary class="text-[11px] text-amber-400 hover:text-amber-300 cursor-pointer select-none">

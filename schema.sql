@@ -279,18 +279,12 @@ CREATE INDEX IF NOT EXISTS idx_sync_log_type       ON sync_log(type);
 -- ENRICHMENT QUEUE
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS enrichment_queue (
-    entity_type TEXT NOT NULL CHECK (entity_type IN ('game', 'wishlist')),
-    entity_id   TEXT NOT NULL,
-    status      TEXT NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending', 'running', 'done', 'failed')),
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    attempts    INTEGER NOT NULL DEFAULT 0,
-    last_error  TEXT,
-    PRIMARY KEY (entity_type, entity_id)
-);
+-- `enrichment_queue` was removed 2026-09-17. It was write-only: `EnqueueEnrichment`
+-- inserted rows and `QueueCounts` counted them, and nothing anywhere ever read one
+-- to process it. Everything that used it now enriches directly (see
+-- sync/enrich_single.go), so the table is dropped by the migration in main.go and
+-- must not be recreated here.
 
-CREATE INDEX IF NOT EXISTS idx_enrichment_queue_status ON enrichment_queue(status);
 
 -- ============================================================
 -- MATCH REVIEW
@@ -321,6 +315,28 @@ CREATE TABLE IF NOT EXISTS match_review (
 );
 
 CREATE INDEX IF NOT EXISTS idx_match_review_decision ON match_review(decision);
+
+-- The ranked candidates the last search found for a game, so a row can offer a
+-- shortlist instead of forcing a yes/no on the single best-scoring hit. The
+-- scorer's ranking is unreliable past the first entry (measured: of 31 re-searches
+-- after a rejection, 0 produced a better-tier match), so the owner chooses rather
+-- than the scorer. match_review.igdb_id remains the *current* pick.
+CREATE TABLE IF NOT EXISTS match_review_candidates (
+    game_id      TEXT    NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    igdb_id      INTEGER NOT NULL,
+    rank         INTEGER NOT NULL,               -- 1 = best
+    igdb_name    TEXT    NOT NULL DEFAULT '',
+    cover_url    TEXT    NOT NULL DEFAULT '',
+    release_year TEXT    NOT NULL DEFAULT '',
+    confidence   TEXT    NOT NULL DEFAULT '',
+    score        REAL    NOT NULL DEFAULT 0,
+    in_library   INTEGER NOT NULL DEFAULT 0,
+    searched_at  TEXT,
+    PRIMARY KEY (game_id, igdb_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_match_review_candidates_game
+    ON match_review_candidates (game_id, rank);
 
 -- IGDB ids the owner has explicitly rejected for a game. A rejected entry is
 -- never offered as a candidate again, which is what lets "no, try again" come

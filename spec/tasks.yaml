@@ -529,6 +529,48 @@ tasks:
     outcome: Turn saved verdicts into changes. A yes links the game to the candidate it was shown and re-enriches it; do not reuse the old /review path (SetIGDBMatch + EnqueueEnrichment), which marks the game manual and enqueues into a queue nothing reads — share the pipeline's own per-game write instead so a hand-applied match cannot drift from a searched one. A no records the rejected igdb_id so it is never offered again, searches afresh excluding it, and returns the row to the undecided queue; a no must never write to games. The run must be re-runnable and a second pass over the same verdicts must be a no-op. While here, fix the Find candidates status wiring: its target id exists nowhere and the shared status partial polls a hardcoded /sync/status.
     acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'match_review_rejections' schema.sql", "grep -q 'MATCH-004' spec/evidence/MATCH-004.md", "grep -q '0 of 36 changed' spec/evidence/MATCH-004.md"]
 
+  # ── Round 2026-09-17 (sixth pass) — ruling in spec/PRODUCT-10.md ──────────
+
+  - id: MATCH-005
+    title: Clean the IGDB search string so decorated titles can be found
+    status: done
+    capability: strong-coder
+    environment: [local]
+    depends_on: [DEPLOY-011]
+    scope: [sync/igdb.go, sync/igdb_search_test.go, spec/evidence/MATCH-005.md]
+    outcome: The rows with no candidate are a search failure, not a scoring one — IGDB's literal search returns an empty set for a decorated title. Strip trailing parenthetical notes, trailing bundle parts and edition/collection suffixes from the query only, so scoring still sees the stored title and bestMatch still demands exact equality. Do not strip variant products that are different games, such as Christmas Edition. Add permanent unit tests covering the real failing titles and the guards that cleaning cannot empty a title.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./sync -run TestSearchTitle", "grep -q 'MATCH-005' spec/evidence/MATCH-005.md", "grep -q '38 rows gained a candidate' spec/evidence/MATCH-005.md"]
+
+  - id: MATCH-006
+    title: Offer a candidate shortlist instead of one auto-chosen replacement
+    status: done
+    capability: strong-coder
+    environment: [local]
+    depends_on: [MATCH-005]
+    scope: [schema.sql, db/store.go, sync/igdb.go, sync/match_apply.go, templates/match_row_partial.html, spec/evidence/MATCH-006.md]
+    outcome: The scorer's ranking past the first hit is untrustworthy (0 of 31 rejections ever produced a better-tier replacement), so stop deciding on the owner's behalf. Store the ranked candidates from each search, render up to two alternates per row with a pick button, and make a no promote the next non-rejected entry from the stored list rather than spending a search that could only re-derive the same ranks. Rows seeded before shortlists must fall back to one search.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'match_review_candidates' schema.sql", "grep -q 'MATCH-006' spec/evidence/MATCH-006.md"]
+
+  - id: MATCH-007
+    title: Remove the dead enrichment queue and fix its three call sites
+    status: done
+    capability: strong-coder
+    environment: [local]
+    depends_on: [MATCH-004]
+    scope: [sync/enrich_single.go, db/store.go, db/models.go, schema.sql, main.go, handlers/enrichment.go, handlers/library.go, spec/evidence/MATCH-007.md]
+    outcome: enrichment_queue is write-only and has three call sites, not one — the /review manual match links without enriching, Rehydrate answers Queued. and does nothing, and manual game add links without fetching. Share one enrich-from-IGDB path across all of them, add RehydrateGame that refreshes by stored id or by an exact title match and reports what happened, then delete EnqueueEnrichment, QueueCounts and the table behind an idempotent drop. Confirm the table is empty and that no game is marked manual before deleting anything.
+    acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'DROP TABLE IF EXISTS enrichment_queue' main.go", "grep -q 'MATCH-007' spec/evidence/MATCH-007.md"]
+
+  - id: DEPLOY-012
+    title: Deploy the search fix, shortlists and queue removal, then re-seed
+    status: done
+    capability: human
+    environment: [atlas]
+    depends_on: [MATCH-005, MATCH-006, MATCH-007]
+    scope: [spec/evidence/DEPLOY-012.md]
+    outcome: Check the server tree, deploy, and confirm the startup migration created match_review_candidates and dropped enrichment_queue. Take a backup and re-seed so the shortlists populate, then record the before/after for candidates, shortlists and rejected entries still offered, and confirm integrity checks pass. Remove the runner from the container, the host and the tree.
+    acceptance: ["curl -s -o /dev/null -w '%{http_code}' http://192.168.3.174:8090/", "grep -q 'f20da8a75091' spec/evidence/DEPLOY-012.md", "grep -q '117' spec/evidence/DEPLOY-012.md"]
+
   - id: DEPLOY-011
     title: Deploy the true-up and apply the first verdicts on live
     status: done

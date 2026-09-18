@@ -52,13 +52,20 @@ library changes: **50 games linked and re-enriched**, 31 rejected candidates
 replaced with a different offer, 5 with nothing else to offer, 0 errors. This is
 the first review path that writes to `games`. See below.
 
-`OPEN.md` holds **four unanswered entries** — the `sync_log` CHECK still
+A **sixth pass opened and closed the same day** (`PRODUCT-10.md`), acting on three
+recommendations Bobby adopted in full: the search string is now cleaned so decorated
+titles can be found at all (**+38 candidates**, 130 → 168), candidates are offered as
+a **shortlist** rather than one auto-chosen replacement, and the **dead
+`enrichment_queue` is deleted** with all three of its call sites fixed — including a
+`Rehydrate` button that had been answering "Queued." while doing nothing. See below.
+
+`OPEN.md` holds **three unanswered entries** — the `sync_log` CHECK still
 rejecting `mystery_packs` (`handlers/sync.go:457`), whether the deploy rsync
-should use `--delete`, the three dormant fetchers (`SyncSteamDeckStatus`,
-`SyncProtonRatings`, `SyncSteamCrossRefs`) that nothing calls, and newly
-**`enrichment_queue`, which has no consumer at all** so `/review`'s manual match
-links a game and never enriches it. Nothing may derive work from any of them; they
-need a ruling first.
+should use `--delete`, and the three dormant fetchers (`SyncSteamDeckStatus`,
+`SyncProtonRatings`, `SyncSteamCrossRefs`) that nothing calls. Nothing may derive
+work from any of them; they need a ruling first. The fourth — `enrichment_queue`
+being write-only — was ruled and executed this round (`MATCH-007`); the entry moved
+to *Resolved*.
 
 ## Established baseline
 
@@ -517,17 +524,47 @@ drains. **`/review` links games without enriching them.** Recorded in `OPEN.md`
 rather than fixed, because whether to delete the machinery or build the missing
 consumer is a ruling.
 
+## Match review round, sixth pass (2026-09-17) — search reach, shortlists, dead queue
+
+Bobby adopted all three recommendations in full, caveats included.
+
+- **`MATCH-005`** — the rows with no candidate were a *search* failure, not a
+  scoring one. IGDB's `search` is literal and returned **nothing** for `Batman:
+  Arkham Asylum GOTY Edition`, `Baldur's Gate: The Original Saga`, `Astebreed:
+  Definitive Edition`, `BloodNet (FDD version)` and 144 more, while the undecorated
+  title found the game every time. Decoration (parentheticals, bundle tails,
+  edition suffixes) is now stripped **from the query only** — scoring still sees the
+  stored title and `bestMatch` still demands exact equality, so a wider search can
+  reach a match but never re-rank one. Pinned by 28 unit tests, 17 of them real
+  library titles. **Gain: 38 of the 148** rows, 130 → **168** with a candidate.
+- **`MATCH-006`** — the scorer's ordering past the first hit is not trustworthy
+  (0 of 31 rejections ever yielded a better-tier replacement), so it no longer
+  decides for the owner. `match_review_candidates` stores the ranking; a row shows
+  its current candidate plus up to **2 alternatives**, each one click to take; and a
+  no **promotes locally** from the stored list with no API call. 501 candidates
+  across 168 games; **117 rows** have alternatives to show.
+- **`MATCH-007`** — `enrichment_queue` was write-only and had **three** call sites,
+  not one: `/review`'s match linked without enriching, the **`Rehydrate`** button
+  answered "Queued." and did nothing, and manual game add linked without fetching.
+  Measured 0 rows and 0 games marked `manual` before deleting, so nothing was lost.
+  All three now enrich via the shared `enrichFromIGDB` path.
+- **`DEPLOY-012`** — live, image **`f20da8a75091`** (previous `912505fd941d`).
+  Migration confirmed: `match_review_candidates` created, `enrichment_queue` gone.
+  Re-seed: 278 searched, 168 with a candidate, 0 errors, **0 rejected entries still
+  offered**.
+
 ## Next task
 
-None — `DEPLOY-011` closed the fifth pass on 2026-09-17, and
+None — `DEPLOY-012` closed the sixth pass on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
 **The queue is ready to keep working through at `/match-review`**: 278 games still
-undecided, 185 candidates carrying evidence, and the ones with nothing to compare
-against searchable in place. Answers save per page and survive sessions, and the
-**Apply verdicts** button is now safe to press at any point — it applies whatever
-is outstanding and does nothing when nothing is. The 50 games already accepted are
-linked and fully enriched, so their cover art and metadata come from IGDB now.
+undecided, **168 with a candidate** all carrying evidence, 117 of them offering a
+shortlist, and the 110 with nothing to compare against searchable in place — that
+search box also benefits from the cleaning, since pasting a decorated title used to
+return nothing. Answers save per page and survive sessions, and **Apply verdicts**
+is safe to press at any point: it applies whatever is outstanding and does nothing
+when nothing is. The 50 games already accepted are linked and fully enriched.
 
 **Two older gaps are recorded rather than closed, and neither blocks anything.**
 

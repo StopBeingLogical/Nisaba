@@ -9,6 +9,9 @@
 ---
 
 ## Top-Level Changes (Major only)
+- The match queue can finally find games whose titles carry store decoration. IGDB's search is literal and returned **nothing at all** for `Batman: Arkham Asylum GOTY Edition`, `Baldur's Gate: The Original Saga`, `Astebreed: Definitive Edition` and 143 others, so no amount of scoring could help. Stripping the decoration from the *query* only — scoring still sees the stored title — gained candidates for **38 of the 148** rows with none, taking the queue from 130 to **168**, with nothing regressed (2026-09-17)
+- Each candidate row now offers a **shortlist** — the best match plus up to two alternatives, each one click to take. Rejecting a candidate promotes the next alternative from the list already on file, with no extra API call. Measured on live: 501 candidates across 168 games, and 117 rows with alternatives to show (2026-09-17)
+- Removed `enrichment_queue`, which nothing ever drained, and fixed all **three** places that relied on it: `/review`'s manual match linked a game and never enriched it, the **Rehydrate** button answered "Queued." while doing nothing at all, and manual game add linked without fetching. All three now enrich through the same path the rest of the app uses (2026-09-17)
 - **Your saved match verdicts now apply to the library.** Games you marked yes are linked to their IGDB entry and fully re-enriched, and games you marked no have the rejected entry remembered so it is never offered again and are searched afresh. On the first run: **50 games linked and re-enriched**, 31 re-matched, 5 with nothing else to offer, 0 errors — games holding an IGDB id went **3060 → 3110**, and every one of the 3388 games has cover art (2026-09-17)
 - Pressing **Find candidates** on the match review page now actually shows its progress — it was pointing at an element that did not exist and would have polled the wrong status endpoint. The Apply button was built on the corrected pattern (2026-09-17)
 - The **Match Review** page became workable: each candidate now carries IGDB's summary, genres, platforms and a link to its IGDB entry, and every row has its own IGDB search box, so a pairing can be judged — or replaced — without leaving the queue. This targeted the 143 of 242 undecided rows that had **no candidate at all** and could not be started. Picking a result saves it and marks the row yes at once; all **99** undecided candidates now hold evidence, and the re-seed moved **0** of the 242 pairings (2026-09-17)
@@ -31,6 +34,9 @@
 - Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
+- `match_review_candidates` stores the ranked candidates behind the shortlist; `enrichment_queue` is dropped as write-only dead code (2026-09-17)
+- New `sync/enrich_single.go` provides the single-game link-and-enrich path shared by `/review`, `Rehydrate` and manual game add, replacing the broken `SetIGDBMatch` + `EnqueueEnrichment` pair (2026-09-17)
+- `sync/igdb_search_test.go` pins the search cleaning with 28 cases, 17 of them real library titles that previously returned nothing (2026-09-17)
 - `match_review_rejections` remembers IGDB entries ruled out per game, so a re-match returns something different instead of the same wrong candidate. A rejected entry can never be re-offered, while a deliberate manual pick still overrides it (2026-09-17)
 - Candidate evidence was filled for the 86 review rows already ruled on, using the `igdb_id` already stored rather than re-running a search, and updating only the four evidence columns — so no candidate, confidence or verdict could move. All **185** candidates now carry evidence (2026-09-17)
 - `match_review` gains `summary`, `genres`, `platforms` and `igdb_url`, filled when a candidate is found rather than fetched per page view; `SetManualMatch` writes a hand-picked entry unconditionally and sets `decision = 1`, because choosing the match is the verdict (2026-09-17)

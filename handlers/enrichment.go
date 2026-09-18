@@ -59,14 +59,17 @@ func (h *Handler) SetMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set the manual match. Full metadata enrichment runs in the background
-	// after the IGDB ID is stored — the enrichment pipeline handles the rest.
-	if err := h.store.SetIGDBMatch(id, igdbID); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+	// Link and enrich in one step. The previous version only linked and marked the
+	// game `manual`, then queued a row nothing ever drained — so the game was left
+	// out of the enrichment pool and never filled in. See sync.ApplySingleMatch.
+	client := h.igdbClient()
+	if client == nil {
+		http.Error(w, "IGDB credentials are not configured", http.StatusServiceUnavailable)
 		return
 	}
-	if err := h.store.EnqueueEnrichment("game", id); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+	if err := storesync.ApplySingleMatch(h.store, client, id, igdbID); err != nil {
+		log.Printf("SetMatch %s: %v", id, err)
+		http.Error(w, "IGDB lookup failed", http.StatusBadGateway)
 		return
 	}
 
