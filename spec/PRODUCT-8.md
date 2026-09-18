@@ -66,12 +66,25 @@ assumed: all **242** undecided pairings were byte-identical before and after the
 live re-seed, because adding `platforms.name` to the fetched fields does not
 reach the scoring function.
 
-### 4. Already-decided rows keep no evidence, deliberately
+### 4. Already-decided rows get evidence too, but by a separate, narrower path
 
-The re-seed skips them, so the 86 rows already ruled on show no summary or IGDB
-link on the Yes/No tabs. Left as-is: evidence exists to help make a decision, and
-those decisions are made. If they are revisited during the true-up, the ruling
-above (a manual pick overrides unconditionally) still lets a row be corrected.
+The candidate search skips rows already ruled on, which left the 86 decided rows
+with a candidate and no evidence on the Yes/No tabs. Initially left as-is — on the
+reasoning that evidence exists to help make a decision and those decisions were
+made — and **reversed on Bobby's word** once it was clear the tabs would be
+revisited during the true-up.
+
+The reversal is not done by relaxing the skip. Instead the evidence is filled by
+looking the candidate up **by the `igdb_id` already stored** and updating **only**
+the four evidence columns. So the operation cannot move a candidate, change a
+confidence, or alter a verdict, which matters because these are exactly the rows
+holding the owner's answers. The `UpsertMatchCandidate` guard is untouched, and
+this path searches for nothing — there is no `bestMatch` call anywhere in it.
+
+**Ruled constraint:** anything that touches a decided row must be narrower than
+the thing that touches an undecided one. `MATCH-003` is the only repair performed
+this way, and it was checked by diffing every other column across all 328 rows
+before and after.
 
 ### 5. What is still not wired
 

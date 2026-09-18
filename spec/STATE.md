@@ -449,7 +449,15 @@ keyboard shortcuts and a bulk-accept, so neither was built.
   undecided. Adding `platforms.name` to the fetched fields does not reach the
   scoring function, so re-running the search cannot shift a candidate under an unruled row.
 - Live now: **99 of 99** undecided candidates carry an IGDB URL, 92 a summary, 94
-  genres, 95 platforms. The 86 already-decided rows keep no evidence by design.
+  genres, 95 platforms.
+- **`MATCH-003`** — the 86 decided rows were initially left without evidence, then
+  filled on Bobby's word once it was clear the Yes/No tabs get revisited during the
+  true-up. Not by relaxing the skip (that would re-rank candidates under his
+  verdicts) but by looking each candidate up **by the `igdb_id` already stored** and
+  updating **only** the four evidence columns. 86 filled, 0 failed. Every
+  non-evidence column was diffed across all **328** rows before and after and is
+  identical, so the split stays 50 yes / 36 no. **All 185 candidates now carry
+evidence.** No application code changed, so there was nothing to deploy.
 
 **A false alarm worth remembering.** The first post-deploy route check returned
 `404` for `/library` and `/match-review`, which looked like a regression; the
@@ -461,12 +469,16 @@ Nisaba is published on **8090**.
 None — `DEPLOY-010` closed the fourth pass on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
-**The queue is ready to keep working through at `/match-review`** and is now
-usable on every row: 328 games, 185 with a candidate, 242 still undecided, and the
-143 that had nothing to compare against can be searched in place. Answers save per
-page and survive sessions. **No verdict is applied to `games` yet** — the true-up
-is a separate pass and still needs its own ruling on what a `yes` should do (link
-only, or link and re-enrich) and what a `no` should do to the game.
+**The queue is ready to keep working through at `/match-review`** and is usable on
+every row: 328 games, 185 with a candidate all carrying evidence, 242 still
+undecided, and the 143 that had nothing to compare against can be searched in
+place. Answers save per page and survive sessions. **No verdict is applied to
+`games` yet** — the true-up is a separate pass and still needs its own ruling on
+what a `yes` should do (link only, or link and re-enrich) and what a `no` should
+do to the game. `SetIGDBMatch` + `EnqueueEnrichment` already exist in
+`handlers/enrichment.go` from the older `/review` queue, so a yes is cheap to
+implement once the semantics are ruled; a no has a precedent too (`SkipMatch`
+sets `enrichment_status = 'manual'` to hide a game from the queue).
 
 **Two older gaps are recorded rather than closed, and neither blocks anything.**
 

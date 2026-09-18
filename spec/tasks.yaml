@@ -507,6 +507,16 @@ tasks:
     outcome: Bobby reported the queue needs rows inspected one by one. Make it workable without loosening anything further — none of the evidence options change which candidate is found. Store the candidate's IGDB summary, genres, platform names and page URL alongside it so a pairing can be judged without leaving the page, and put an IGDB search box on every row so a wrong or absent candidate can be replaced in place. Picking a result stores it and marks the row yes immediately; the page's Save must keep governing only the yes/no radios. Re-seeding must not move a candidate under an undecided row, and rows already ruled on stay untouched.
     acceptance: ["go build ./...", "go vet ./...", "go test ./...", "grep -q 'igdb_url' schema.sql", "grep -q 'MATCH-002' spec/evidence/MATCH-002.md"]
 
+  - id: MATCH-003
+    title: Fill candidate evidence for the rows already ruled on
+    status: done
+    capability: strong-coder
+    environment: [local, atlas]
+    depends_on: [DEPLOY-010]
+    scope: [spec/evidence/MATCH-003.md]
+    outcome: The candidate search skips decided rows, so the 86 rows already ruled on show a bare pairing with no evidence on the Yes/No tabs. Fill it without relaxing that guard — look the candidate up by the igdb_id already stored and update only the four evidence columns, so no candidate, confidence or verdict can move. Do not deploy: the application never performs this operation. Verify by diffing every non-evidence column across all 328 rows before and after, and record how much of the IGDB shortfall is genuinely absent data.
+    acceptance: ["grep -q 'MATCH-003' spec/evidence/MATCH-003.md", "grep -q 'all 328 rows identical in every non-evidence column' spec/evidence/MATCH-003.md", "grep -q '185' spec/evidence/MATCH-003.md"]
+
   - id: DEPLOY-010
     title: Deploy the evidence columns and re-seed the candidate queue
     status: done

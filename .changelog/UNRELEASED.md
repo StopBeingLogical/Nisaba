@@ -29,6 +29,7 @@
 - Added 3 lowest prices display on wishlist detail pages (2026-06-28)
 
 ## db/ Changes
+- Candidate evidence was filled for the 86 review rows already ruled on, using the `igdb_id` already stored rather than re-running a search, and updating only the four evidence columns — so no candidate, confidence or verdict could move. All **185** candidates now carry evidence (2026-09-17)
 - `match_review` gains `summary`, `genres`, `platforms` and `igdb_url`, filled when a candidate is found rather than fetched per page view; `SetManualMatch` writes a hand-picked entry unconditionally and sets `decision = 1`, because choosing the match is the verdict (2026-09-17)
 - IGDB fetches now include `platforms.name`, which the review page shows; `CandidateFromGame` is the single place an IGDB entry becomes a review candidate, used by both the finder and the manual pick (2026-09-17)
 - Added the `match_review` table: one row per unmatched game holding the best IGDB candidate and a **three-valued** verdict (`NULL` undecided / 1 correct / 0 wrong), so a review can be paused and resumed. Store methods list, count, save decisions, upsert a candidate, and return the set of already-matched IGDB ids (2026-09-17)
