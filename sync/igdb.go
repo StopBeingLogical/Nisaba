@@ -859,15 +859,23 @@ func toRoman(n int) string {
 func searchTitle(s string) string {
 	s = strings.NewReplacer("™", "", "®", "", "©", "", "\u00a0", " ").Replace(s)
 	s = strings.Join(strings.Fields(s), " ")
-	// Removing a trademark can leave a space before punctuation, as in "Batman :".
-	s = strings.NewReplacer(" :", ":", " ,", ",", " .", ".", " ;", ";").Replace(s)
+	s = tightenSeparators(s)
 
 	cleaned := cleanSearchTitle(s)
 	// Never let cleaning empty a title the search could still use.
 	if cleaned == "" {
 		return s
 	}
-	return cleaned
+	// Cleaning removed something from the middle of a word run, so the same space
+	// can appear again: "Tomb Raider (VI): The Angel of Darkness" loses its "(VI)"
+	// and is left with "Tomb Raider : The Angel of Darkness".
+	return tightenSeparators(cleaned)
+}
+
+// tightenSeparators closes the gap a removal can leave before punctuation, as in
+// "Batman :" after a trademark goes, or "Tomb Raider :" after a bracketed note.
+func tightenSeparators(s string) string {
+	return strings.NewReplacer(" :", ":", " ,", ",", " .", ".", " ;", ";").Replace(s)
 }
 
 // searchEditionSuffixes are trailing store decorations that carry no weight with
@@ -898,6 +906,31 @@ func trimSearchSeparators(s string) string {
 	return strings.TrimRight(strings.TrimSpace(s), searchSeparators+" ")
 }
 
+// stripBracketSegments removes every "(…)" or "[…]" group, wherever it sits —
+// including one that never closes, whose tail is dropped with it. Brackets hold
+// store notes, years, format tags and edition labels, never part of a game's own
+// name, so removing them can only widen the search; and because scoring still runs
+// against the title exactly as stored, a wrongly dropped tail cannot make a match
+// stricter than it was. An input that is nothing but bracket groups returns empty,
+// which cleanSearchTitle treats as "do not shorten this" rather than as a query.
+func stripBracketSegments(s string) string {
+	var b strings.Builder
+	depth := 0
+	for _, r := range s {
+		switch {
+		case r == '(' || r == '[':
+			depth++
+		case r == ')' || r == ']':
+			if depth > 0 {
+				depth--
+			}
+		case depth == 0:
+			b.WriteRune(r)
+		}
+	}
+	return strings.Join(strings.Fields(b.String()), " ")
+}
+
 // cleanSearchTitle removes trailing decoration until the title stops shrinking:
 // a parenthesised note or year, an edition suffix, and a trailing bundle part.
 func cleanSearchTitle(s string) string {
@@ -905,7 +938,15 @@ func cleanSearchTitle(s string) string {
 	for {
 		prev := cur
 
+		// A bracketed note anywhere in the title, not only at the end. Stores
+		// number series in the middle: "Heroes Chronicles [Chapter 1] - Warlords
+		// of the Wasteland" matched nothing at all until the marker came out of
+		// the query, and there are eight rows of exactly that shape.
+		cur = stripBracketSegments(cur)
+
 		// A trailing "(...)" or "[...]" note, e.g. "BloodNet (FDD version)".
+		// Still needed for an unbalanced bracket, which the pass above leaves
+		// alone rather than guessing where the group ended.
 		if strings.HasSuffix(cur, ")") {
 			if i := strings.LastIndex(cur, "("); i > 0 {
 				cur = strings.TrimSpace(cur[:i])

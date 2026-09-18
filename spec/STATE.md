@@ -569,11 +569,24 @@ the wrong game while IGDB's own website found it.
   search is now a **name-anchored** wildcard lookup merged ahead of the ranked one,
   25 rows each, with a subtitle retried on both of its possible heads. **Exact matches
   1 → 10 and usable candidates 7 → 48** across the 110 rows that had none.
-- **`DEPLOY-013`** — live, image **`0bc200e39e63`** (previous `f20da8a75091`).
-  Dry-run first, since a re-seed re-searches rows already looked at: 278 rows,
-  43 gained a candidate, 70 replaced (47 scored higher, **0 lower**), 0 lost,
-  0 errors. Re-seed live in 4m51s: **168 → 211** undecided rows with a candidate,
-  67 without, shortlists 501 → 753. The 50 decided rows are byte-identical.
+- **`MATCH-008`, second pass** — asked what the rows that *still* found nothing had
+  in common, and twelve were one shape: a store series marker in the middle of the
+  title, `Heroes Chronicles [Chapter 1] - Warlords of the Wasteland` (×8) and
+  `Leisure Suit Larry (VGA)` (×2). Only a *trailing* bracket group was ever stripped.
+  Now any group is, and **10 of the 67** gained a candidate; two more are explained
+  rather than missed — the search offers `MDK 2 HD` and `Battle Isle 2220`, both of
+  which the owner had already **rejected**, so the rejection memory is holding them
+  out. Of the 30 rows with a candidate and a bracket, **0 scored worse**. A de-spaced
+  anchor (`MDK 2` → IGDB's `MDK2`) was measured at **1 row of 67** and deliberately
+  **not built** — the box finds it when typed, and the form would cost 270ms on every
+  search.
+- **`DEPLOY-013`** — live in two passes, images **`0bc200e39e63`** (previous
+  `f20da8a75091`) then **`dd5101c15dbd`**. Dry-run first, since a re-seed re-searches
+  rows already looked at: 278 rows, 43 gained a candidate, 70 replaced (47 scored
+  higher, **0 lower**), 0 lost, 0 errors. Re-seed live in 4m51s: **168 → 211** with a
+  candidate, 67 without, shortlists 501 → 753. After the bracket pass, a second
+  re-seed in 4m20s: **211 → 221** with a candidate, **67 → 57** without, all 8
+  `Heroes Chronicles` rows filled. The 50 decided rows are byte-identical both times.
 
 **Two bugs were caught inside this pass, before deploy.** The client's rate limiting
 had to move: a search is no longer one request, and every caller paced itself per
@@ -588,10 +601,11 @@ None — `DEPLOY-013` closed the seventh pass on 2026-09-17, and
 `scripts/spec-next.sh local,atlas,network` prints nothing.
 
 **The queue is ready to keep working through at `/match-review`**: 278 games still
-undecided, **211 with a candidate** all carrying evidence, 167 of them offering a
-shortlist, and the **67 with nothing to compare against searchable in place** — and
-that search box is now the thing this round fixed. `Against the Storm`, `Fallout 2`
-and `Dragonview` all resolve to the right entry first. Answers save per page and
+undecided, **221 with a candidate** all carrying evidence, and the **57 with nothing
+to compare against searchable in place** — and that search box is now the thing this
+round fixed. `Against the Storm`, `Fallout 2`, `Dragonview` and
+`Heroes Chronicles [Chapter 1] - Warlords of the Wasteland` all resolve to the right
+entry. Answers save per page and
 survive sessions, and **Apply verdicts** is safe to press at any point. The 50 games
 already accepted are linked and fully enriched.
 
@@ -601,7 +615,8 @@ entries, and the **prefix tier is generous**: when the stored title extends an I
 name the extension need not look like a subtitle, so the re-seed replaced some
 weak-but-correct candidates with confident-but-wrong ones — `Call of Duty: WaW` →
 `Call of Duty`, `STAR WARS™: Rebel Assault 1` → `Star Wars`, `M.A.X.` → `Max`
-(exact, via punctuation stripping). Measured over the queue, 47 replacements scored
+(exact, via punctuation stripping), and `Tomb Raider (VI): The Angel of Darkness` →
+`Tomb Raider` over the correct entry at a lower tier. Measured over the queue, 47 replacements scored
 higher and **none scored lower**, so this is the cost of reaching further rather
 than a regression — but a confidently wrong pairing costs a click to reject, and the
 rejection is remembered.

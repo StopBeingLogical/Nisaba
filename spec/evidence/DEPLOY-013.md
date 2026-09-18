@@ -88,6 +88,40 @@ diffed:
     before: 50 rows, after: 50 rows
     DECIDED_ROWS_IDENTICAL
 
+## Second pass — the bracket change deployed and re-seeded
+
+The bracket fix from `MATCH-008`'s second pass, deployed the same way.
+
+    $ ssh truenas_admin@192.168.3.174 'sudo docker inspect --format "{{.Image}}" nisaba'   # before
+    sha256:0bc200e39e6305fc95b063ee8e61d9eea565dec64e3ba3a978b08f6963dc2b93
+    $ ssh truenas_admin@192.168.3.174 "cd /mnt/MemoryAlpha/nisaba/source && bash deploy.sh"
+    $ ssh truenas_admin@192.168.3.174 'sudo docker inspect --format "{{.Image}}" nisaba'   # after
+    sha256:dd5101c15dbdf7193997851e6aa90499f9503c06ea41864207e132424610d97a
+
+**Rollback target: `0bc200e39e63`. Deployed: `dd5101c15dbd`.**
+
+Backup: `/mnt/MemoryAlpha/nisaba/backups/2026-09-17-1946/nisaba.db`.
+
+Re-seed, 278 rows in **4m20s**, 0 errors:
+
+    undecided                                            278
+    undecided WITH a candidate                    211 -> 221
+    undecided WITHOUT a candidate                  67 ->  57
+    shortlist entries                             753 -> 796
+    rejections                                            36
+    rejected entries still offered                         0
+    Heroes Chronicles rows now filled                      8
+    integrity_check                                       ok
+
+    before: 50 decided rows, after: 50 decided rows
+    DECIDED_ROWS_IDENTICAL
+
+The 10 gained rows are the bracket fix, matching the 10 predicted on the copy before
+the run. `games` and `games with an igdb id` are unchanged at 3388 and 3110: the seed
+writes only `match_review`.
+
+Runner removed from the container, the host and the tree; never committed.
+
 ## Corrected mid-flight
 
 The first post-deploy route check reported `404` on `/library` and `/match-review`.

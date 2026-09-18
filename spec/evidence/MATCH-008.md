@@ -104,6 +104,46 @@ partial — what the owner actually sees:
   "Dragonview"                                   ->  1 result,  first igdb_id 42635    (Dragon View)
 ```
 
+## Second pass — a bracketed note in the middle of a title
+
+Asked instead what the 67 rows that still found nothing had in common. Twelve were the
+same shape: a store series marker sitting mid-title, which `cleanSearchTitle` never
+reached because it stripped a **trailing** bracket group only.
+
+| title | IGDB name it should find | before | after |
+|---|---|---|---|
+| `Heroes Chronicles [Chapter 1] - Warlords of the Wasteland` | `Heroes Chronicles: Warlords of the Wasteland` | nothing | 0.65 tokens |
+| `Heroes Chronicles [Chapter 8] - The Sword of Frost` | `Heroes Chronicles: The Sword of Frost` | nothing | 0.65 tokens |
+| `Leisure Suit Larry 1 (VGA) - In the Land of the Lounge Lizards` | `Leisure Suit Larry 1: In the Land of the Lounge Lizards` | nothing | 0.68 tokens |
+| `Leisure Suit Larry 6 (VGA) - Shape Up Or Slip Out` | `Leisure Suit Larry 6: Shape Up or Slip Out!` | nothing | 0.68 tokens |
+| `Tomb Raider (VI): The Angel of Darkness (2003)` | `Tomb Raider: The Angel of Darkness` | (had a candidate) | query corrected |
+
+`stripBracketSegments` now removes every bracket group wherever it sits. Measured
+over the 67: **10 rows recovered**. Two more are explained rather than missed — the
+search does find a match for them and the owner had already rejected it:
+
+```
+  MDK 2          held out: MDK 2 HD (0.85, rejected)
+  Battle Isle 3  held out: Battle Isle 2220: Shadow of the Emperor (0.05, rejected)
+```
+
+Of the 30 rows that already had a candidate and carry a bracket in the title, **0
+scored worse**. One flipped: `Tomb Raider (VI): The Angel of Darkness (2003)` now
+prefers `Tomb Raider` at 0.85 over the correct game at 0.65 — the prefix tier again,
+and recorded with the rest of it in `spec/OPEN.md`.
+
+Stripping a group can leave a space before punctuation the earlier pass had already
+closed, which produced the query `Tomb Raider : The Angel of Darkness`. The cleanup
+now runs again after cleaning and is pinned by a test.
+
+## Considered and deliberately not built
+
+Anchoring on the title with its spaces removed, for names IGDB concatenates and the
+store does not: `MDK 2` → IGDB's `MDK2`, scoring **1.00 exact**. Measured over the
+same 67 rows: **1 recovered**. The search box finds it as soon as the title is typed
+`MDK2`, and the form would cost 270ms on the front of every search, so it is not
+implemented. The numbers are here so it does not need re-deriving.
+
 ## Not fixed here, and why
 
 `search` returning summary noise for common words is inherent to the endpoint, not a

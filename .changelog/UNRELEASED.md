@@ -9,6 +9,7 @@
 ---
 
 ## Top-Level Changes (Major only)
+- Bracketed notes now come out of a title wherever they sit, not only at the end: the eight `Heroes Chronicles [Chapter N] - …` rows and both `Leisure Suit Larry (VGA)` rows matched **nothing** until the marker left the middle of the query. **10 of the 67** rows still empty gained a candidate; of the 30 rows that already had one and carry a bracket, **none scored worse** (2026-09-17)
 - **The match review search box works.** Searching a title used to offer the wrong games: IGDB's `search` is a conjunction over *every* word matched against summaries too, and its ranking put the correct entry for `Against the Storm` at position 10 while the query asked for 5. The search now also looks the title up **by name**, asks for 25 rows instead of 5, and drops its platform filter. Across the 110 rows that had no candidate, exact matches went **1 → 10** and usable candidates **7 → 48**; the queue went from 168 to **211** rows with a candidate. `Against the Storm` now resolves to the game itself instead of `Metal Storm` (2026-09-17)
 - Subtitles are searched on both possible heads, and the first attempt at that matched `Warhammer 40,000: Dawn of War II` to **Dawn of War — the wrong game**. A title is now cut at its *last* separator first (`…Dawn of War II - Anniversary Edition` → `…Dawn of War II`) and at its *first* only as a fallback (`Fallout 2: A Post Nuclear Role Playing Game` → `Fallout 2`). Both cases previously returned **nothing at all** (2026-09-17)
 - Matching now sees through concatenated words: `Dragonview` scored **zero** against IGDB's `Dragon View` and the correct entry was thrown away (2026-09-17)
@@ -86,6 +87,8 @@
 - Added 3 lowest prices display to wishlist detail page (2026-06-28)
 
 ## sync/ Changes
+- `stripBracketSegments` removes every `(…)` / `[…]` group from a search query wherever it sits, including one that never closes; a mid-title marker like `[Chapter 1]` was why a whole series found nothing. A decorator removal can reopen a gap before punctuation, so the separator cleanup runs again after cleaning (2026-09-17)
+- Considered and **not built**: anchoring on the de-spaced title, for names IGDB concatenates and the store does not (`MDK 2` → IGDB's `MDK2`, an exact match). It recovers 1 row of 67, the search box finds it as soon as `MDK2` is typed, and the form would cost 270ms on every search. Measured numbers kept in `MATCH-008` (2026-09-17)
 - A title search is now two sources merged: a **name-anchored** `where name ~ *"…"*` lookup, which cannot return summary noise and cannot be outranked, ahead of IGDB's ranked search, which reaches variants a name lookup cannot (`Battle Isle 2` → `Battle Isle 2200`). Both ask for 25 rows; a subtitle is retried on both of its possible heads, narrowest first (2026-09-17)
 - `SearchGamePC` is gone and the platform filter with it — `where platforms = (6)` did not merely drop console rows, it returned a different result set and pushed exact matches further down, while `bestMatch` already prefers a PC entry among exact names (2026-09-17)
 - IGDB pacing now lives in `IGDBClient.query`, the single funnel every call passes through. Every caller paced itself at 250ms per *game*, so a search that is now two to six requests would have put two to four times that rate on the wire (2026-09-17)

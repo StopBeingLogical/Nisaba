@@ -53,12 +53,22 @@ deleted.
   prefix. Over the whole queue the re-seed scored 47 replacements higher and **0
   lower**, so this is the cost of reaching further rather than a regression — but a
   confidently wrong pairing is presented as plausible, and every one costs a click.
+  A third instance surfaced in `MATCH-008`'s second pass, and it is the clearest one:
+  `Tomb Raider (VI): The Angel of Darkness (2003)` prefers **`Tomb Raider`** at 0.85
+  over the correct `Tomb Raider: The Angel of Darkness`, which is only a *token*
+  match at 0.11 because the store's `(VI)` normalises to `6` and adds a token the
+  IGDB name lacks. A tie-break would not help there — the right entry scores strictly
+  lower — which suggests the real question is whether the tiers should be ordered by
+  **coverage of the stored title** (how much of it a candidate accounts for) rather
+  than by match shape: `Tomb Raider` covers 2 of its 8 tokens, the correct entry 5.
   Options I can see, not a recommendation: (a) require the extension to be two words
   or more and not a single acronym token; (b) break score ties by specificity so the
   **longest** matching IGDB name wins — `Star Wars: TIE Fighter` over `Star Wars`,
-  which would also fix the Dawn of War case; (c) leave it, since a rejection is
-  remembered and the row shows its evidence. Each is cheap to measure against the
-  stored shortlists before it is ruled on. Not derived into a task.
+  which would also fix the Dawn of War case but not this one; (c) rank by coverage of
+  the stored title; (d) leave it, since a rejection is remembered and the row shows
+  its evidence. Each is cheap to measure against the stored shortlists — and, for the
+  two thirds of rows already carrying a verdict, against the owner's **own answers**
+  — before it is ruled on. Not derived into a task.
 
 ## Model inferences, unratified
 

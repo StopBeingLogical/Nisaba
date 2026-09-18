@@ -36,7 +36,20 @@ func TestSearchTitle(t *testing.T) {
 		{"Chicken Invaders 5: Christmas Edition", "Chicken Invaders 5: Christmas Edition", "a variant product, not an edition sticker"},
 		{"Above Snakes", "Above Snakes", "untouched"},
 
+		// Bracketed notes in the middle of a title, taken from the live rows that
+		// found nothing until the marker came out of the query.
+		{"Heroes Chronicles [Chapter 1] - Warlords of the Wasteland", "Heroes Chronicles - Warlords of the Wasteland", "series marker mid-title"},
+		{"Heroes Chronicles [Chapter 8] - The Sword of Frost", "Heroes Chronicles - The Sword of Frost", "series marker mid-title"},
+		{"Leisure Suit Larry 1 (VGA) - In the Land of the Lounge Lizards", "Leisure Suit Larry 1 - In the Land of the Lounge Lizards", "format tag mid-title"},
+		{"Leisure Suit Larry 6 (VGA) - Shape Up Or Slip Out", "Leisure Suit Larry 6 - Shape Up Or Slip Out", "format tag mid-title"},
+		{"Medal of Honor(TM) Multiplayer", "Medal of Honor Multiplayer", "trademark in parens"},
+		{"Tomb Raider (VI): The Angel of Darkness (2003)", "Tomb Raider: The Angel of Darkness", "bracket before a colon must not leave a space"},
+		{"Nested (outer [inner]) note", "Nested note", "nested groups"},
+		{"Half-Life (unclosed", "Half-Life", "an unclosed group takes its tail with it"},
+		{"Warcraft (Orcs & Humans", "Warcraft", "the tail is store metadata; scoring still sees it"},
+
 		// Guards: cleaning must never empty or gut a title.
+		{"() [] ()", "() [] ()", "would empty — kept"},
 		{"Deluxe", "Deluxe", "would empty — kept"},
 		{"GOTY", "GOTY", "would empty — kept"},
 		{"(1999)", "(1999)", "would empty — kept"},

@@ -112,7 +112,31 @@ Stores concatenate words IGDB spaces out, and no token test can see through it: 
 tokens are disjoint, so `Dragonview` scored **zero** against `Dragon View` and the
 correct entry was discarded. Spacing is now ignored for the exact tier.
 
-### 8. Re-seed the queue
+### 8. A bracketed note comes out of the middle of a title too
+
+Continued after the first re-seed, by asking what the rows that *still* find nothing
+have in common. Twelve of the 67 were the same shape: a store series marker sitting in
+the middle of the title, `Heroes Chronicles [Chapter 1] - Warlords of the Wasteland`
+(×8) and `Leisure Suit Larry 1 (VGA) - In the Land of the Lounge Lizards` (×2).
+`cleanSearchTitle` stripped a *trailing* bracket group only.
+
+Bracket groups are now removed **wherever they sit**, including one that never
+closes — its tail is store metadata, and scoring still runs against the title
+exactly as stored, so a wrongly dropped tail cannot make a match stricter than it
+was. Measured: **12 of 67** recovered by the query change itself, and **10** stored
+once the owner's own rejections are honoured (the other two had already been ruled
+out — see below).
+
+### 9. A query is only worth one *extra* idea, and this one did not earn it
+
+The same measurement covered a second idea: anchoring on the title with its spaces
+removed, for names IGDB concatenates where the store does not (`MDK 2` → IGDB's
+`MDK2`, which scores an **exact** match). It recovers **1 row of 67**, and the search
+box already finds it the moment the title is typed that way. That is not worth 270ms
+on the front of every search, so it is **not implemented** — recorded here so the
+idea does not have to be re-derived.
+
+### 10. Re-seed the queue
 
 The widened search reaches further, so the queue is re-seeded to take the better
 candidates. Rows already ruled on are skipped by design and were verified untouched.
@@ -129,6 +153,13 @@ On the 110 undecided rows that had no candidate, plus three controls (113 rows):
 No row regressed: the widened ranked query is a superset of the old one, and that is
 asserted rather than assumed. Live after re-seeding: **168 → 211** undecided rows
 with a candidate, 0 errors, the 50 decided rows byte-identical, `integrity_check ok`.
+
+Then the bracket pass, over the 67 rows still empty: **10 recovered**, plus **2**
+where the only match the search could offer is one the owner had **already rejected**
+(`MDK 2` → `MDK 2 HD`, `Battle Isle 3` → `Battle Isle 2220`) — the rejection memory
+holding, not a miss. Of the 30 rows that already had a candidate and carry a bracket,
+**0 scored worse**. Live after the second re-seed: **211 → 221** with a candidate,
+**67 → 57** without, all 8 `Heroes Chronicles` rows filled, decided rows identical.
 
 ## The cost, recorded rather than hidden
 
